@@ -1,0 +1,33 @@
+[gd_scene load_steps=5 format=3]
+[ext_resource type="Script" path="res://scripts/arena.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/zone.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/ui.tscn" id="3"]
+[ext_resource type="Resource" path="res://data/balance.tres" id="4"]
+[node name="IronCrown" type="Node2D"]
+script = ExtResource("1")
+balance = ExtResource("4")
+[node name="Zones" type="Node2D" parent="."]
+[node name="Zone0" parent="Zones" instance=ExtResource("2")]
+position = Vector2(520, 430)
+radius = 145.0
+[node name="Zone1" parent="Zones" instance=ExtResource("2")]
+position = Vector2(1590, 370)
+radius = 120.0
+[node name="Zone2" parent="Zones" instance=ExtResource("2")]
+position = Vector2(2690, 520)
+radius = 145.0
+[node name="Zone3" parent="Zones" instance=ExtResource("2")]
+position = Vector2(750, 1690)
+radius = 130.0
+[node name="Zone4" parent="Zones" instance=ExtResource("2")]
+position = Vector2(1630, 1320)
+radius = 155.0
+[node name="Zone5" parent="Zones" instance=ExtResource("2")]
+position = Vector2(2700, 1760)
+radius = 130.0
+[node name="Actors" type="Node2D" parent="."]
+y_sort_enabled = true
+[node name="Projectiles" type="Node2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(1600, 1100)
+[node name="UI" parent="." instance=ExtResource("3")]

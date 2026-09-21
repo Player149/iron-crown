@@ -1,0 +1,64 @@
+[gd_scene load_steps=10 format=3]
+[ext_resource type="Script" path="res://scripts/fighter.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/knight.svg" id="2"]
+[ext_resource type="Texture2D" path="res://assets/sword.svg" id="3"]
+[ext_resource type="Texture2D" path="res://assets/shield.svg" id="4"]
+[sub_resource type="CircleShape2D" id="Body"]
+radius = 25.0
+[sub_resource type="CircleShape2D" id="Attack"]
+radius = 84.0
+[sub_resource type="Animation" id="Reset"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
+tracks/0/keys = {"times": PackedFloat32Array(0), "transitions": PackedFloat32Array(1), "update": 0, "values": [0.0]}
+[sub_resource type="Animation" id="Swing"]
+resource_name = "swing"
+length = 0.32
+tracks/0/type = "value"
+tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
+tracks/0/keys = {"times": PackedFloat32Array(0, 0.08, 0.2, 0.32), "transitions": PackedFloat32Array(1, 1, 1, 1), "update": 0, "values": [-1.1, -0.8, 0.9, 0.0]}
+[sub_resource type="AnimationLibrary" id="Anims"]
+_data = {"RESET": SubResource("Reset"), "swing": SubResource("Swing")}
+[node name="Fighter" type="CharacterBody2D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1")
+[node name="BodyShape" type="CollisionShape2D" parent="."]
+shape = SubResource("Body")
+[node name="Visual" type="Node2D" parent="."]
+[node name="Body" type="Sprite2D" parent="Visual"]
+texture = ExtResource("2")
+scale = Vector2(0.8, 0.8)
+[node name="Shield" type="Sprite2D" parent="Visual"]
+position = Vector2(12, 25)
+texture = ExtResource("4")
+scale = Vector2(0.65, 0.65)
+[node name="WeaponPivot" type="Node2D" parent="Visual"]
+[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot"]
+position = Vector2(48, -15)
+texture = ExtResource("3")
+scale = Vector2(0.7, 0.7)
+[node name="AttackArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 0
+monitoring = false
+[node name="Shape" type="CollisionShape2D" parent="AttackArea"]
+shape = SubResource("Attack")
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {&"": SubResource("Anims")}
+[node name="NameLabel" type="Label" parent="."]
+offset_left = -90.0
+offset_top = -64.0
+offset_right = 90.0
+offset_bottom = -40.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+mouse_filter = 2
+[node name="Health" type="ProgressBar" parent="."]
+offset_left = -30.0
+offset_top = -38.0
+offset_right = 30.0
+offset_bottom = -31.0
+show_percentage = false
+mouse_filter = 2
