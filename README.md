@@ -1,5 +1,7 @@
 # IRON CROWN · Godot edition
 
+[게임 실행](https://player149.github.io/iron-crown/) · [배포 현황](https://github.com/Player149/iron-crown/actions) · [검증 결과와 제한](docs/STATUS.md)
+
 Godot 4.5.1 / GDScript / Compatibility 렌더러로 이식한 싱글플레이 아레나 게임입니다. 원본 HTML을 감싼 형태가 아니라 Godot 씬·노드·리소스·AnimationPlayer로 구성했습니다.
 
 ## 열기 / 편집
