@@ -1,32 +1,40 @@
-; Iron Crown — open this file in Godot 4.5.1
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
+
 config/name="Iron Crown"
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/crown.svg"
 
 [autoload]
+
 Meta="*res://scripts/meta.gd"
 
+[debug]
+
+gdscript/warnings/inference_on_variant=0
+
 [display]
-window/size/viewport_width=1152
-window/size/viewport_height=648
+
 window/size/window_width_override=1152
 window/size/window_height_override=648
 window/stretch/mode="canvas_items"
-window/handheld/orientation=0
 
 [rendering]
+
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/default_filters/use_nearest_mipmap_filter=false
 environment/defaults/default_clear_color=Color(0.025, 0.04, 0.07, 1)
-
-[input_devices]
-pointing/emulate_mouse_from_touch=true
-
-[debug]
-gdscript/warnings/untyped_declaration=0
-gdscript/warnings/inference_on_variant=0
