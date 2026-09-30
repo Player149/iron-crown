@@ -5,7 +5,25 @@ var joystick_id: int = -1
 var active_buttons: Dictionary = {}
 var knob: Vector2 = Vector2.ZERO
 
+func _ready() -> void:
+	resized.connect(func():
+		clear_input()
+		queue_redraw())
+
+func joystick_origin() -> Vector2:
+	return Vector2(82, size.y - 94) if size.x < size.y else Vector2(104, size.y - 94)
+
 func button_layout() -> Array:
+	if size.x < size.y:
+		return [
+			["attack", "공격", Vector2(size.x - 52, size.y - 90), 40.0],
+			["block", "막기", Vector2(size.x - 138, size.y - 52), 32.0],
+			["dash", "대시", Vector2(size.x - 138, size.y - 136), 32.0],
+			["e", "E", Vector2(size.x - 212, size.y - 226), 29.0],
+			["r", "R", Vector2(size.x - 132, size.y - 226), 29.0],
+			["q", "Q", Vector2(size.x - 52, size.y - 226), 29.0],
+			["run", "달리기", Vector2(82, size.y - 220), 30.0]
+		]
 	return [
 		["attack", "공격", Vector2(size.x - 66, size.y - 84), 42.0],
 		["block", "막기", Vector2(size.x - 155, size.y - 53), 32.0],
@@ -28,7 +46,10 @@ func clear_input() -> void:
 
 func _input(event: InputEvent) -> void:
 	if arena == null or not arena.active(): return
-	var origin = Vector2(104, size.y - 94)
+	if is_instance_valid(arena.player) and not arena.player.can_act():
+		clear_input()
+		return
+	var origin = joystick_origin()
 	if event is InputEventScreenTouch:
 		arena.touch_mode = true
 		if event.pressed:
@@ -57,7 +78,7 @@ func _input(event: InputEvent) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var origin = Vector2(104, size.y - 94)
+	var origin = joystick_origin()
 	draw_circle(origin, 68, Color(0.08, 0.15, 0.24, 0.7))
 	draw_arc(origin, 68, 0, TAU, 40, Color("7891a9"), 2)
 	draw_circle(origin + knob, 26, Color(0.7, 0.8, 0.95, 0.45))

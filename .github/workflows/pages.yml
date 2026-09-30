@@ -38,6 +38,8 @@ jobs:
         run: godot --headless --path . --editor --quit
       - name: Verify combat, progression and boss restoration
         run: godot --headless --path . --script res://tests/run.gd
+      - name: Verify portrait and landscape layouts
+        run: godot --headless --path . --script res://tests/layout.gd
       - name: Export Web
         run: |
           mkdir -p build/web

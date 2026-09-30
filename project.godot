@@ -29,6 +29,10 @@ gdscript/warnings/inference_on_variant=0
 
 [display]
 
+window/size/viewport_width=1152
+window/size/viewport_height=648
+window/handheld/orientation=6
+
 window/size/window_width_override=1152
 window/size/window_height_override=648
 window/stretch/mode="canvas_items"

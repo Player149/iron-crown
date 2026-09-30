@@ -4,6 +4,9 @@ var arena
 var font = preload("res://assets/NotoSansKR.ttf")
 var notice_time: float = 0
 var feed_lines: Array = []
+var last_window_size = Vector2i.ZERO
+var last_touch_mode: bool = false
+var compact: bool = false
 @onready var menu = $Root/Menu
 @onready var box = $Root/Menu/Center/Box
 @onready var hud = $Root/HUD
@@ -29,6 +32,10 @@ func _ready() -> void:
 		hud.get_node("Info/" + pair[0]).add_theme_stylebox_override("fill", fill)
 	style_buttons(menu)
 	style_buttons(hud)
+	for child in box.get_children():
+		if child is Label: child.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	get_window().size_changed.connect(refresh_layout)
+	refresh_layout.call_deferred()
 
 func style_buttons(node: Node) -> void:
 	if node is Button:
@@ -53,13 +60,15 @@ func _process(dt: float) -> void:
 	notice_time = maxf(0, notice_time - dt)
 	hud.get_node("Notice").visible = notice_time > 0
 	if arena == null: return
+	if last_touch_mode != arena.touch_mode:
+		last_touch_mode = arena.touch_mode
+		refresh_layout(true)
 	hud.get_node("Minimap").arena = arena
-	hud.get_node("Minimap").visible = not arena.touch_mode
+	hud.get_node("Minimap").visible = not arena.touch_mode and not compact
 	touch.arena = arena
 	touch.visible = arena.active() and arena.touch_mode
 	if not arena.active(): touch.clear_input()
-	hud.get_node("Skills").offset_top = -215 if arena.touch_mode else -68
-	hud.get_node("Skills").offset_bottom = -164 if arena.touch_mode else -14
+
 
 func show_menu() -> void:
 	menu.show()
@@ -91,6 +100,7 @@ func clear_modal(title: String, subtitle: String = "") -> void:
 func add_label(text: String, size: int = 18, color: Color = Color("d0daeb")) -> Label:
 	var label = Label.new()
 	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
 	panel.add_child(label)
@@ -99,6 +109,8 @@ func add_label(text: String, size: int = 18, color: Color = Color("d0daeb")) -> 
 func add_button(text: String, callback: Callable, parent: Node = null) -> Button:
 	var button = Button.new()
 	button.text = text
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.custom_minimum_size.y = 46
 	button.pressed.connect(callback)
 	(parent if parent != null else panel).add_child(button)
@@ -153,7 +165,7 @@ func show_gameover() -> void:
 
 func show_shop(message: String = "") -> void:
 	clear_modal("룬 · 장비 보관함", "보유 %d 골드 · 최대 3개 장착 · 룬 최대 Lv.5" % Meta.gold)
-	var row = HBoxContainer.new()
+	var row = VBoxContainer.new()
 	panel.add_child(row)
 	add_button("룬 상자 · 800", func():
 		if Meta.gold < 800:
@@ -175,7 +187,8 @@ func show_shop(message: String = "") -> void:
 		show_shop("시작권 획득"), row)
 	if not message.is_empty(): add_label(message, 16, Color("edbb63"))
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(650, 230)
+	scroll.custom_minimum_size = Vector2(0, 200)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	panel.add_child(scroll)
 	var items = VBoxContainer.new()
 	items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -230,3 +243,44 @@ func feed(text: String) -> void:
 
 static func time_text(seconds: float) -> String:
 	return "%02d:%02d" % [int(maxf(0, seconds)) / 60, int(maxf(0, seconds)) % 60]
+
+# Preserve the simulation when the browser viewport / device orientation changes.
+func refresh_layout(force: bool = false) -> void:
+	var physical = get_window().size
+	if physical.x <= 0 or physical.y <= 0: return
+	if not force and physical == last_window_size: return
+	last_window_size = physical
+	var ratio = float(physical.x) / physical.y
+	var base_width = maxf(432, 648 * ratio)
+	var logical = Vector2i(roundi(base_width), roundi(base_width / ratio))
+	get_window().content_scale_size = logical
+	compact = logical.x < 1000
+	var width = float(logical.x)
+	var height = float(logical.y)
+	box.custom_minimum_size.x = minf(540, width - 40)
+	panel.custom_minimum_size.x = minf(650, width - 40)
+	box.get_node("Title").add_theme_font_size_override("font_size", 46 if compact else 58)
+	box.get_node("Help").text = "WASD 이동 · 좌클릭 공격 · 우클릭 막기
+Shift 달리기 · Space 대시 · E/R/Q 기술
+모바일: 조이스틱 + 전투 버튼 / 세로·가로 자동 전환"
+	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 150))
+	place_hud("Pause", Rect2(width - 112, 16, 96, 48))
+	place_hud("Boss", Rect2(16, 180, width - 32, 54) if compact else Rect2(width / 2 - 160, 18, 320, 54))
+	hud.get_node("Boss").add_theme_font_size_override("font_size", 15 if compact else 18)
+	hud.get_node("Leaderboard").visible = not compact
+	hud.get_node("Feed").visible = not compact
+	place_hud("Notice", Rect2(16, height * 0.32, width - 32, 80))
+	hud.get_node("Notice").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var mobile = arena != null and arena.touch_mode
+	var bottom = 320 if mobile and ratio < 1 else (280 if mobile else 68)
+	place_hud("Skills", Rect2(16, height - bottom, width - 32, 48))
+	hud.get_node("Skills").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	place_hud("Minimap", Rect2(width - 222, height - 168, 198, 136))
+	touch.clear_input()
+	touch.queue_redraw()
+
+func place_hud(node_name: String, rect: Rect2) -> void:
+	var control = hud.get_node(node_name)
+	control.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	control.position = rect.position
+	control.size = rect.size
