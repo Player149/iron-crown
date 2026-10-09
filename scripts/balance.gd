@@ -4,9 +4,9 @@ extends Resource
 @export_category("Base growth")
 @export var max_level: int = 40
 @export var starting_hp: float = 100.0
-@export var final_hp: float = 400.0
+@export var final_hp: float = 260.0
 @export var starting_stamina: float = 100.0
-@export var final_stamina: float = 200.0
+@export var final_stamina: float = 170.0
 @export_category("Combat")
 @export var stamina_regen: float = 20.0
 @export var attack_cost: float = 15.0
@@ -28,4 +28,4 @@ extends Resource
 @export var boss_duration: float = 180.0
 
 func xp_needed(level: int) -> float:
-	return floor(38.0 + level * 15.0 + pow(level, 1.28) * 5.0)
+	return floor(25.0 + level * 8.0 + pow(level, 1.20) * 2.8)
