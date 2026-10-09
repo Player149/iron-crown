@@ -46,8 +46,24 @@ jobs:
       - name: Export Web
         run: |
           mkdir -p build/web
-          godot --headless --path . --export-release Web build/web/index.html
+          if [[ "$GITHUB_REF" == "refs/heads/test1" ]]; then
+            mkdir -p build/web/test1
+            godot --headless --path . --export-release Web build/web/test1/index.html
+          else
+            godot --headless --path . --export-release Web build/web/index.html
+          fi
           touch build/web/.nojekyll
+      - uses: actions/checkout@v6
+        if: github.ref == 'refs/heads/test1'
+        with:
+          ref: main
+          path: production
+      - name: Import original main project for safe combined preview
+        if: github.ref == 'refs/heads/test1'
+        run: godot --headless --path production --editor --quit
+      - name: Export original main unchanged to Pages root
+        if: github.ref == 'refs/heads/test1'
+        run: godot --headless --path production --export-release Web "$GITHUB_WORKSPACE/build/web/index.html"
       - uses: actions/upload-artifact@v4
         with:
           name: iron-crown-web-test1
@@ -58,7 +74,7 @@ jobs:
         with:
           path: build/web
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
