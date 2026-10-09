@@ -6,7 +6,7 @@ var equipped: Array = []
 var boosts: int = 0
 var player_name: String = "방랑 기사"
 var muted: bool = false
-const SAVE_PATH = "user://iron_crown_v2.json"
+const SAVE_PATH = "user://iron_crown_test1.json"
 
 func _ready() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
@@ -18,8 +18,8 @@ func _ready() -> void:
 			boosts = int(saved.get("boosts", 0))
 			player_name = str(saved.get("name", "방랑 기사"))
 			muted = bool(saved.get("muted", false))
-	elif OS.has_feature("web"):
-		# Same-origin migration from the old Canvas game, only on first launch.
+	elif OS.has_feature("web") and false:
+		# Disabled for TEST1 so preview never imports or overwrites main save.
 		var raw = JavaScriptBridge.eval("localStorage.getItem('ironCrownMeta')", true)
 		if raw is String:
 			var saved = JSON.parse_string(raw)
