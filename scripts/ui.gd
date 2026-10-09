@@ -21,6 +21,9 @@ func _ready() -> void:
 		Meta.save_data()
 		arena.start_game(box.get_node("Boost").button_pressed))
 	box.get_node("Shop").pressed.connect(show_shop)
+	box.get_node("Eyebrow").text = "IRON CROWN / TEST 1 / BRANCHING EVOLUTION"
+	box.get_node("Subtitle").text = "계보 진화 · 무기별 전투 · 자세 붕괴 실험"
+	box.get_node("Tags").text = "Lv.5 / 15 / 25 분기 · 자세 게이지 · AI 테스트"
 	hud.get_node("Pause").pressed.connect(func():
 		if arena.choice_open: return
 		arena.paused = true
@@ -118,20 +121,38 @@ func add_button(text: String, callback: Callable, parent: Node = null) -> Button
 	return button
 
 func show_choices(event: Dictionary) -> void:
-	var evolution = event.kind == "evolution"
-	clear_modal("진화할 계통을 선택하세요" if evolution else "능력 하나를 선택하세요", "LEVEL %d  ·  이번 생존 동안 유지됩니다" % event.level)
-	var options = CrownCatalog.EVOLUTIONS[event.level].duplicate() if evolution else CrownCatalog.STATS.duplicate()
+	var evolution: bool = event.kind == "evolution"
+	clear_modal("TEST 1 / 계보 진화" if evolution else "능력 하나를 선택하세요", "LEVEL %d · 현재 직업에 따라 다음 분기가 달라집니다" % event.level if evolution else "LEVEL %d · 이번 생존 동안 유지됩니다" % event.level)
+	var options: Array = CrownTest1Rules.options_for(arena.player, int(event.level)) if evolution else CrownCatalog.STATS.duplicate()
 	if not evolution:
 		options.shuffle()
 		options = options.slice(0, 3)
-	for choice in options:
-		var selected = choice
-		add_button("%s\n%s" % [choice[1], choice[2]], func():
-			if evolution: CrownCatalog.evolve(arena.player, selected)
-			else: CrownCatalog.apply_stat(arena.player, selected[0])
+	if options.is_empty():
+		add_label("이 단계의 진화가 없습니다.", 15)
+		add_button("돌아가기", func():
 			modal.hide()
 			arena.choice_open = false
 			arena.process_choices())
+		return
+	var parent: Node = panel
+	if options.size() >= 5:
+		var scroll = ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.custom_minimum_size = Vector2(0, minf(365, maxf(185, get_window().content_scale_size.y * 0.46)))
+		panel.add_child(scroll)
+		var list = VBoxContainer.new()
+		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.add_theme_constant_override("separation", 6)
+		scroll.add_child(list)
+		parent = list
+	for choice in options:
+		var selected: Array = choice
+		add_button("%s\n%s" % [choice[1], choice[2]], func():
+			if evolution: CrownTest1Rules.evolve(arena.player, selected)
+			else: CrownCatalog.apply_stat(arena.player, selected[0])
+			modal.hide()
+			arena.choice_open = false
+			arena.process_choices(), parent)
 
 func show_pause(open: bool) -> void:
 	if not open:
@@ -215,8 +236,8 @@ func update_hud() -> void:
 	hud.get_node("Info/Health").value = 100 * p.hp / p.max_hp
 	hud.get_node("Info/Stamina").value = 100 * p.stamina / p.max_stamina
 	hud.get_node("Info/XP").value = 100 if p.level == 40 else 100 * p.xp / arena.balance.xp_needed(p.level)
-	hud.get_node("Info/Stats").text = "HP %d/%d   ST %d/%d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), floori(p.stamina), roundi(p.max_stamina), arena.run_gold, arena.run_kills, roundi(p.damage)]
-	hud.get_node("Info/Status").text = ("탈진 %.1f초" % p.exhausted) if p.exhausted > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투")
+	hud.get_node("Info/Stats").text = "HP %d/%d   ST %d/%d\n골드 %d · 처치 %d · 공격 %d\n자세 %d/100%s" % [ceili(p.hp), roundi(p.max_hp), floori(p.stamina), roundi(p.max_stamina), arena.run_gold, arena.run_kills, roundi(p.damage), roundi(p.posture), (" · 발열 %d" % roundi(p.robot_heat)) if p.combat_style == "robot" else ""]
+	hud.get_node("Info/Status").text = ("자세 붕괴 %.1f초" % p.stagger_left) if p.stagger_left > 0 else (("탈진 %.1f초" % p.exhausted) if p.exhausted > 0 else ("%s · 전투 중" % p.class_name_text if p.combat_left > 0 else p.class_name_text + " · 비전투"))
 	if arena.mode == "boss" and arena.boss != null:
 		hud.get_node("Boss").text = "BOSS %s · %s\nHP %d / %d" % [arena.boss.display_name, time_text(arena.boss_timer), ceili(arena.boss.hp), roundi(arena.boss.max_hp)]
 	else: hud.get_node("Boss").text = "다음 보스 선정\n" + time_text(arena.boss_countdown)
@@ -260,12 +281,12 @@ func refresh_layout(force: bool = false) -> void:
 	box.custom_minimum_size.x = minf(540, width - 40)
 	panel.custom_minimum_size.x = minf(650, width - 40)
 	box.get_node("Title").add_theme_font_size_override("font_size", 46 if compact else 58)
-	box.get_node("Help").text = "WASD 이동 · 좌클릭 공격 · 우클릭 막기
+	box.get_node("Help").text = "TEST 1 · 계보형 진화 · 자세 붕괴\nWASD 이동 · 좌클릭 공격 · 우클릭 막기
 Shift 달리기 · Space 대시 · E/R/Q 기술
 모바일: 조이스틱 + 전투 버튼 / 세로·가로 자동 전환"
-	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 150))
+	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 172))
 	place_hud("Pause", Rect2(width - 112, 16, 96, 48))
-	place_hud("Boss", Rect2(16, 180, width - 32, 54) if compact else Rect2(width / 2 - 160, 18, 320, 54))
+	place_hud("Boss", Rect2(16, 197, width - 32, 54) if compact else Rect2(width / 2 - 160, 18, 320, 54))
 	hud.get_node("Boss").add_theme_font_size_override("font_size", 15 if compact else 18)
 	hud.get_node("Leaderboard").visible = not compact
 	hud.get_node("Feed").visible = not compact
