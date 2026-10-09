@@ -385,3 +385,30 @@ func _draw() -> void:
 				draw_circle(Vector2.from_angle(facing + i * TAU / 4) * 32, 5, Color("e3a3d7"))
 		"angel":
 			draw_arc(Vector2.ZERO, 47, facing - 1.7, facing + 1.7, 22, Color("f3e7a2"), 4)
+	# TEST1 silhouette identifiers for heads/weapon families. All are temporary.
+	if "horn" in form_id or "beast" in form_id:
+		draw_line(Vector2(-24, -10), Vector2(-35, -40), Color("ddd4ba"), 7)
+		draw_line(Vector2(24, -10), Vector2(35, -40), Color("ddd4ba"), 7)
+	if "wing" in form_id or "angel" in form_id or "celestial" in form_id:
+		for direction in [-1, 1]:
+			draw_line(Vector2(direction * 24, 10), Vector2(direction * 70, -22), Color("dceffb"), 11)
+			draw_line(Vector2(direction * 28, 12), Vector2(direction * 62, 20), Color("f5e7b9"), 8)
+	if "king" in form_id or "royal" in form_id or "captain" in form_id or "queen" in form_id:
+		draw_line(Vector2(-26, -29), Vector2(-26, -44), Color("efd274"), 5)
+		draw_line(Vector2(0, -29), Vector2(0, -49), Color("efd274"), 6)
+		draw_line(Vector2(26, -29), Vector2(26, -44), Color("efd274"), 5)
+		draw_line(Vector2(-27, -29), Vector2(27, -29), Color("efd274"), 6)
+	if "pirate" in form_id:
+		draw_line(Vector2(-41, -33), Vector2(41, -33), Color("332a39"), 9)
+	if "spider" in form_id:
+		for i in 6:
+			var v: Vector2 = Vector2.from_angle(i * TAU / 6.0)
+			draw_line(v * 28, v * 48, Color("b39db3"), 4)
+	if "eye" in form_id or "mothership" in form_id or "manyeyes" in form_id:
+		for i in 6:
+			var v: Vector2 = Vector2.from_angle(i * TAU / 6.0)
+			draw_circle(v * 42, 6, Color("dceffb"))
+			draw_circle(v * 42, 2.5, Color("46223b"))
+	if "hammer" in form_id and attack_pending:
+		draw_arc(Vector2.ZERO, 76, 0, TAU * (1.0 - minf(1.0, attack_windup / 0.5)), 25, Color("e0ba7e"), 5)
+
