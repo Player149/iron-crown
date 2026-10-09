@@ -39,6 +39,18 @@ var dash_left: float = 0
 var dash_velocity: Vector2 = Vector2.ZERO
 var facing: float = 0
 var evolutions: Array = []
+var combat_style: String = "sword"
+var form_id: String = ""
+var posture: float = 0.0
+var stagger_left: float = 0.0
+var stagger_protection: float = 0.0
+var parry_left: float = 0.0
+var previous_block: bool = false
+var attack_pending: bool = false
+var attack_windup: float = 0.0
+var dash_strike: bool = false
+var robot_heat: float = 0.0
+var attack_chain: int = 0
 var class_name_text: String = "초보 기사"
 var cooldown: Dictionary = {"attack": 0.0, "dash": 0.0, "e": 0.0, "r": 0.0, "q": 0.0}
 var base_stats: Dictionary
@@ -71,6 +83,15 @@ func tick(dt: float) -> void:
 		cooldown[key] = maxf(0, cooldown[key] - dt)
 	invuln = maxf(0, invuln - dt)
 	exhausted = maxf(0, exhausted - dt)
+	stagger_left = maxf(0, stagger_left - dt)
+	stagger_protection = maxf(0, stagger_protection - dt)
+	parry_left = maxf(0, parry_left - dt)
+	robot_heat = maxf(0, robot_heat - dt * 18.0)
+	if attack_pending:
+		attack_windup = maxf(0, attack_windup - dt)
+		if attack_windup <= 0:
+			attack_pending = false
+			if can_act(): resolve_attack()
 	combat_left = maxf(0, combat_left - dt)
 	no_hit_time += dt
 	blocking = false
@@ -80,10 +101,13 @@ func tick(dt: float) -> void:
 			player_control()
 		else:
 			ai_control(dt)
-	if dash_left > 0 and exhausted <= 0:
+	if dash_left > 0 and can_act():
 		dash_left -= dt
 		velocity = dash_velocity
 		arena.fx_ring(position, 12, Color("79dbf4") if is_player and Meta.rune_level("frost") > 0 else tint, 0.2)
+		if dash_strike and dash_left <= 0.09:
+			dash_strike = false
+			arena.area_attack(self, 72.0 * body_scale, damage * (1.25 if combat_style == "spear" else 0.7))
 	position += velocity * dt
 	var bounds: Rect2 = arena.bounds()
 	position = position.clamp(bounds.position + Vector2.ONE * 30, bounds.end - Vector2.ONE * 30)
@@ -102,7 +126,14 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
-	blocking = (Input.is_action_pressed("block") or arena.touch_block) and stamina > 0
+	var wants_block = (Input.is_action_pressed("block") or arena.touch_block) and stamina > 0
+	if wants_block and not previous_block:
+		if combat_style in ["fist", "dual", "spider"]:
+			dash(move if move.length() > 0.1 else -Vector2.from_angle(facing))
+		else:
+			parry_left = 0.18 if combat_style in ["sword", "shield", "greatsword", "spear"] else 0.0
+	previous_block = wants_block
+	blocking = wants_block and combat_style not in ["fist", "dual", "spider"]
 	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
 	if blocking: multiplier *= 0.5
 	velocity = move * speed * multiplier
@@ -121,20 +152,24 @@ func ai_control(dt: float) -> void:
 	var offset: Vector2 = ai_target.position - position
 	var distance = offset.length()
 	facing = offset.angle()
-	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
+	var preferred = 125.0 if combat_style == "spear" else (76.0 if combat_style in ["fist", "dual"] else 92.0)
+	var toward = 1.0 if distance > preferred else (-0.4 if distance < preferred * 0.65 else 0.0)
 	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
 	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	blocking = ai_block > 0 and stamina > 0
+	blocking = ai_block > 0 and stamina > 0 and combat_style not in ["fist", "dual", "spider"]
+	if blocking and not previous_block and combat_style in ["sword", "shield", "greatsword", "spear"]:
+		parry_left = 0.12
+	previous_block = blocking
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
 	velocity = (offset.normalized() * toward + side) * speed * (0.5 if blocking else 1.0)
-	if distance < 92: attack()
+	if distance < (168 if combat_style == "spear" else 106): attack()
 	if distance < 430 and randf() < dt * 0.5: skill("e")
 	if distance < 220 and randf() < dt * 0.3: skill("r")
 	if distance < 260 and randf() < dt * 0.18: skill("q")
 	if distance > 210 and distance < 440 and randf() < dt * 0.24: dash(offset.normalized())
 
 func can_act() -> bool:
-	return alive and exhausted <= 0
+	return alive and exhausted <= 0 and stagger_left <= 0
 
 func spend(amount: float) -> bool:
 	if combat_left <= 0: return true
@@ -143,66 +178,138 @@ func spend(amount: float) -> bool:
 	return true
 
 func attack() -> void:
-	if not can_act() or blocking or cooldown.attack > 0: return
+	if not can_act() or blocking or cooldown.attack > 0 or attack_pending: return
+	if combat_style == "robot" and robot_heat >= 95: return
 	if not spend(arena.balance.attack_cost): return
-	cooldown.attack = 0.56 / attack_speed
+	attack_chain += 1
+	if combat_style == "robot": robot_heat = minf(100, robot_heat + 24)
+	var tempo = 0.58
+	match combat_style:
+		"fist", "dual": tempo = 0.34
+		"hammer": tempo = 0.95
+		"greatsword": tempo = 0.85
+		"spin": tempo = 0.78
+		"spear": tempo = 0.66
+		"axe", "brute": tempo = 0.76
+	cooldown.attack = tempo / attack_speed
+	attack_windup = (0.4 if combat_style == "hammer" else (0.33 if combat_style == "greatsword" else (0.24 if combat_style in ["spin", "axe"] else 0.12))) / attack_speed
+	attack_pending = true
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
-	var reach = (attack_range_override if attack_range_override > 0 else arena.balance.attack_range) * body_scale
-	var count = 0
-	arena.fx_ring(position + Vector2.from_angle(facing) * 50, reach * 0.5, attack_color(), 0.15)
+
+func resolve_attack() -> void:
+	var reach: float = (attack_range_override if attack_range_override > 0 else arena.balance.attack_range) * body_scale
+	var arc: float = arena.balance.attack_arc
+	var multiplier: float = 1.0
+	var posture_power: float = 12.0
+	match combat_style:
+		"fist": reach *= 0.72; multiplier = 0.68; posture_power = 10
+		"dual": reach *= 0.87; multiplier = 0.76; arc = 1.75
+		"spear": reach *= 1.75; arc = 0.58; multiplier = 1.05
+		"axe": reach *= 1.05; arc = 1.75; multiplier = 1.3; posture_power = 27
+		"greatsword": reach *= 1.45; arc = 1.85; multiplier = 1.75; posture_power = 36
+		"hammer": reach *= 1.14; arc = 1.48; multiplier = 1.7; posture_power = 46
+		"shield": reach *= 0.8; multiplier = 0.8; posture_power = 24
+		"scythe": reach *= 1.35; arc = 2.2; multiplier = 0.98
+		"spin": reach *= 1.38; arc = TAU; multiplier = 1.15; posture_power = 22
+		"shovel": reach *= 1.15; arc = 1.7; multiplier = 1.02; posture_power = 25
+		"brute", "beast": reach *= 1.2; arc = 1.8; multiplier = 1.45; posture_power = 28
+		"robot": reach *= 1.05; multiplier = 1.1
+	arena.fx_ring(position + Vector2.from_angle(facing) * 48, reach * 0.65, attack_color(), 0.18)
+	var count: int = 0
 	for target in arena.targets(self):
 		var offset: Vector2 = target.position - position
-		if offset.length() < reach + target.radius and absf(angle_difference(facing, offset.angle())) < arena.balance.attack_arc * 0.5:
-			var critical = randf() < crit
-			arena.deal_damage(target, damage * (1.7 if critical else 1.0), self)
-			target.position += offset.normalized() * 5
-			count += 1
-			if exhausted > 0 or (count >= 2 and not evolutions.has("reaper")): break
+		if offset.length() > reach + target.radius: continue
+		if absf(angle_difference(facing, offset.angle())) > arc * 0.5: continue
+		var critical = randf() < crit
+		var dealt = arena.deal_damage(target, damage * multiplier * (1.7 if critical else 1.0), self)
+		if dealt <= 0: continue
+		arena.apply_posture(target, posture_power * (1.45 if critical else 1.0), self)
+		if combat_style == "scythe": target.position -= offset.normalized() * 28.0
+		elif combat_style == "shield": target.position += offset.normalized() * 24.0
+		else: target.position += offset.normalized() * 5.0
+		count += 1
+		if combat_style == "dual":
+			arena.deal_damage(target, damage * 0.35, self)
+		if exhausted > 0 or (count >= 2 and combat_style not in ["spin", "scythe", "greatsword"]): break
+	if combat_style == "shovel":
+		arena.fx_ring(position + Vector2.from_angle(facing) * 75, 65, Color("bd9a69"), 0.35)
 	arena.add_xp(self, 0.35)
 
 func dash(direction: Vector2 = Vector2.ZERO) -> void:
 	if not can_act() or cooldown.dash > 0: return
 	if direction.length() < 0.1: direction = Vector2.from_angle(facing)
-	dash_left = 0.17
-	dash_velocity = direction.normalized() * 690
-	invuln = 0.22
-	cooldown.dash = 2.15 * dash_mult
+	dash_left = 0.22 if combat_style in ["spear", "shield", "angel"] else 0.17
+	dash_velocity = direction.normalized() * (900 if combat_style == "spear" else (740 if combat_style in ["shield", "angel"] else 690))
+	dash_strike = combat_style in ["spear", "shield"]
+	invuln = 0.22 if combat_style not in ["fist", "dual"] else 0.31
+	cooldown.dash = (1.5 if combat_style in ["fist", "dual"] else 2.15) * dash_mult
 	arena.sound("dash", self)
 
 func skill(key: String) -> void:
-	var tier = {"e": 1, "r": 2, "q": 3}[key]
+	var tier: int = {"e": 1, "r": 2, "q": 3}[key]
 	if not can_act() or evolutions.size() < tier or cooldown[key] > 0: return
 	if not spend(arena.balance.skill_cost): return
 	cooldown[key] = {"e": 6.5, "r": 11.0, "q": 23.0}[key]
 	arena.add_xp(self, {"e": 1.3, "r": 2.0, "q": 3.0}[key])
 	arena.sound("skill", self)
-	var power = damage * skill_power
-	if key == "e":
-		if evolutions.has("guardian"):
-			arena.area_attack(self, 135, power * 1.25)
-			invuln = maxf(invuln, 0.34)
-		else:
-			var count = 3 if evolutions.has("berserker") else 1
-			for i in count: arena.shoot(self, facing + (i - (count - 1) / 2.0) * 0.18, 420, power * 1.2, 1.15, 2 if evolutions.has("duelist") else 1)
-	elif key == "r":
-		if evolutions.has("lancer"):
-			dash_left = 0.38
-			dash_velocity = Vector2.from_angle(facing) * 850
-			invuln = 0.42
+	var style: String = CrownTest1Rules.style_for(str(evolutions[tier - 1]))
+	var power: float = damage * skill_power * (1.0 + (tier - 1) * 0.32)
+	match style:
+		"shield":
+			invuln = maxf(invuln, 0.35)
+			dash_left = 0.22
+			dash_velocity = Vector2.from_angle(facing) * 730
+			dash_strike = true
+			arena.area_attack(self, 85, power * 0.7)
+		"fist":
+			invuln = maxf(invuln, 0.3)
+			arena.area_attack(self, 90, power * 1.35)
+		"dual":
+			for i in range(-2, 3): arena.shoot(self, facing + i * 0.12, 470, power * 0.32, 0.58)
+		"axe":
 			arena.area_attack(self, 115, power * 1.65)
-		elif evolutions.has("slayer"):
-			for i in range(-2, 3): arena.shoot(self, facing + i * 0.13, 520, power * 0.78, 1.3)
-		else: arena.area_attack(self, 205, power * 1.5)
-	else:
-		if evolutions.has("storm"):
-			for i in 12: arena.shoot(self, i * TAU / 12, 490, power * 0.95, 1.4, 2)
-		elif evolutions.has("colossus"):
-			arena.area_attack(self, 310, power * 2.15)
-			invuln = 1.1
-		else:
-			arena.area_attack(self, 230, power * 2.6)
-			hp = minf(max_hp, hp + max_hp * 0.18)
+		"spin":
+			arena.area_attack(self, 160 * body_scale, power * 1.24)
+		"hammer", "greatsword":
+			arena.area_attack(self, 150 * body_scale, power * 1.72)
+			for target in arena.targets(self):
+				if position.distance_to(target.position) < 150 * body_scale + target.radius: arena.apply_posture(target, 42, self)
+		"spear":
+			dash_left = 0.38
+			dash_velocity = Vector2.from_angle(facing) * 940
+			dash_strike = true
+			invuln = 0.38
+			arena.shoot(self, facing, 550, power * 1.4, 0.8, 2)
+		"scythe":
+			for target in arena.targets(self):
+				if position.distance_to(target.position) < 230:
+					target.position = target.position.move_toward(position, 65)
+					arena.deal_damage(target, power, self)
+			arena.fx_ring(position, 230, Color("a176ce"), 0.38)
+		"summon", "music", "spider":
+			arena.spawn_minion(self, style)
+			if tier >= 2: arena.spawn_minion(self, style)
+			if tier == 3: arena.area_attack(self, 140, power * 0.8)
+		"robot":
+			robot_heat = maxf(0, robot_heat - 50)
+			for i in range(-1, 2): arena.shoot(self, facing + i * 0.25, 500, power * 0.85, 1.0)
+		"shovel":
+			arena.area_attack(self, 170, power * 1.22)
+			arena.fx_ring(position + Vector2.from_angle(facing) * 70, 85, Color("ab8c52"), 0.5)
+		"pirate":
+			var target = arena.nearest_target(self, 220)
+			if target != null:
+				target.position = target.position.move_toward(position, 90)
+				arena.deal_damage(target, power * 1.15, self)
+			arena.shoot(self, facing, 430, power, 0.65)
+		"angel":
+			invuln = maxf(invuln, 0.38)
+			for i in range(-2, 3): arena.shoot(self, facing + i * 0.23, 490, power * 0.72, 0.8)
+		"beast", "brute":
+			arena.area_attack(self, 120 * body_scale, power * 1.65)
+		_:
+			arena.shoot(self, facing, 480, power * 1.25, 1.0, 2)
 
 func exhaust_if_empty() -> void:
 	if stamina > 0 or exhausted > 0: return
@@ -231,6 +338,8 @@ func update_visual() -> void:
 	$Visual.scale = Vector2.ONE * body_scale
 	$Visual/Shield.modulate = Color("bfefff") if blocking else Color("6d798b")
 	$Visual/Body.modulate = Color("ffd47b") if boss_flag else tint
+	$Visual/Shield.visible = combat_style in ["shield", "sword"]
+	$Visual/WeaponPivot.visible = combat_style not in ["fist", "beast", "brute", "spider", "summon", "music", "robot"]
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
 	queue_redraw()
@@ -244,3 +353,35 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 42 * body_scale, facing - 0.8, facing + 0.8, 16, Color("88d7f7"), 4)
 	if exhausted > 0:
 		draw_arc(Vector2(0, -75), 10, 0, TAU * exhausted / 2.0, 16, Color("ffc664"), 3)
+	if stagger_left > 0:
+		draw_arc(Vector2.ZERO, 46 * body_scale, 0, TAU, 28, Color("ffdb77"), 5)
+	if posture > 0:
+		draw_rect(Rect2(-29, -43, 58, 4), Color("1d1a26"))
+		draw_rect(Rect2(-29, -43, 58 * minf(1, posture / 100), 4), Color("f2b969"))
+	if attack_pending:
+		draw_arc(Vector2.ZERO, 38 * body_scale, facing - PI * 0.6, facing + PI * 0.6, 18, Color("ff9c67"), 3)
+	var front = Vector2.from_angle(facing)
+	match combat_style:
+		"spear":
+			draw_line(front * 34, front * 94, Color("c9c6a4"), 5)
+			var tip = front * 104
+			draw_circle(tip, 7, Color("fff1bd"))
+		"axe", "spin":
+			draw_line(front * 35, front * 76, Color("967753"), 7)
+			draw_circle(front * 77, 14, Color("c9d3da"))
+		"hammer":
+			draw_line(front * 35, front * 75, Color("ac8251"), 6)
+			draw_line(front * 75 + front.orthogonal() * 17, front * 75 - front.orthogonal() * 17, Color("bec5d0"), 13)
+		"scythe":
+			draw_line(front * 30, front * 93, Color("888d93"), 5)
+			draw_arc(front * 83, 25, facing - 1.5, facing + 0.7, 12, Color("9f91bc"), 5)
+		"fist", "dual":
+			draw_circle(front.orthogonal() * 19 + front * 26, 10, Color("e0b67b"))
+			draw_circle(-front.orthogonal() * 19 + front * 26, 10, Color("e0b67b"))
+		"robot":
+			draw_rect(Rect2(-19, -19, 38, 38), Color("7ea5aa"), false, 4)
+		"spider", "summon":
+			for i in 4:
+				draw_circle(Vector2.from_angle(facing + i * TAU / 4) * 32, 5, Color("e3a3d7"))
+		"angel":
+			draw_arc(Vector2.ZERO, 47, facing - 1.7, facing + 1.7, 22, Color("f3e7a2"), 4)
