@@ -1,6 +1,6 @@
 # IRON CROWN · Godot edition
 
-> **TEST1 전용 브랜치:** [빠른 진화 체험·전투 스타일·자세 게이지 가이드](docs/TEST1.md). 현행 공개 Pages는 main 기반이며, test1은 GitHub Actions 빌드 아티팩트로 확인할 수 있습니다.
+> **TEST1 전용 브랜치:** [빠른 진화 체험·전투 스타일·자세 게이지 가이드](docs/TEST1.md). 현행 공개 Pages는 main 기반이며, test1은 [별도 웹 미리보기](https://player149.github.io/iron-crown/test1/)에서 실행하도록 설정했습니다. 배포 상태는 Actions에서 확인하세요.
 
 [게임 실행](https://player149.github.io/iron-crown/) · [배포 현황](https://github.com/Player149/iron-crown/actions) · [검증 결과와 제한](docs/STATUS.md)
 
