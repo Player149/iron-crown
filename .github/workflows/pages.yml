@@ -2,7 +2,7 @@ name: Godot Web → Project Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, test1]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -40,6 +40,9 @@ jobs:
         run: godot --headless --path . --script res://tests/run.gd
       - name: Verify portrait and landscape layouts
         run: godot --headless --path . --script res://tests/layout.gd
+      - name: Verify TEST1 branching and posture
+        if: github.ref == 'refs/heads/test1'
+        run: godot --headless --path . --script res://tests/test1.gd
       - name: Export Web
         run: |
           mkdir -p build/web
@@ -47,7 +50,7 @@ jobs:
           touch build/web/.nojekyll
       - uses: actions/upload-artifact@v4
         with:
-          name: iron-crown-web
+          name: iron-crown-web-test1
           path: build/web
           retention-days: 7
       - uses: actions/upload-pages-artifact@v4
@@ -55,7 +58,7 @@ jobs:
         with:
           path: build/web
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
