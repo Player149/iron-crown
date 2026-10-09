@@ -77,7 +77,7 @@ const FORMS = [
 	["spider_queen", "거미 여왕", 25, "spider_spawn", "spider", "덫 · 거미 소환"],
 	["grand_conductor", "왕실 지휘관", 25, "conductor", "music", "광역 음파 · 소환 명령"],
 	["winged_angel", "천공의 천사", 25, "celestial", "angel", "날개 · 빛의 돌진"],
-	["energy_king", "에너지 왕관 기사", 25, "horn_armor", "shield", "빛의 방패 · 검 · 왕관"]
+	["energy_king", "에너지 왕관 기사", 25, "knight_helm", "shield", "빛의 방패 · 검 · 왕관"]
 ]
 
 static func options_for(f, at_level: int) -> Array:
