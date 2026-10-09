@@ -94,8 +94,8 @@ func start_game(boost: bool = false) -> void:
 		var monster = MonsterScene.instantiate()
 		monster.arena = self
 		monster.position = random_position()
-		monster.brute = randf() < 0.25
 		$Actors.add_child(monster)
+		monster.configure_region()
 		monsters.append(monster)
 	if boost and Meta.boosts > 0:
 		Meta.boosts -= 1
@@ -276,7 +276,7 @@ func kill_target(target, killer) -> void:
 	fx_ring(target.position, 70, Color("ff627f"), 0.5)
 	if not target is CrownFighter:
 		target.respawn_timer = randf_range(8, 14)
-		if killer is CrownFighter: add_xp(killer, 48 if target.brute else 28)
+		if killer is CrownFighter: add_xp(killer, 60 if target.kind == "crown" else (42 if target.kind == "ruins" else 24))
 		return
 	if mode == "boss":
 		if target == boss: boss_finish_pending = true
@@ -473,6 +473,12 @@ func fx_ring(at: Vector2, radius: float, color: Color, life: float) -> void:
 func _draw() -> void:
 	var rect = bounds()
 	draw_rect(rect, Color("1d1420") if mode == "boss" else Color("12232d"))
+	if mode != "boss":
+		var middle: Vector2 = balance.world_size * 0.5
+		draw_circle(middle, 850, Color("26333c"))
+		draw_circle(middle, 470, Color("40313c"))
+		draw_arc(middle, 850, 0, TAU, 96, Color("7a6b78"), 4)
+		draw_arc(middle, 470, 0, TAU, 96, Color("b88b73"), 4)
 	for x in range(0, int(balance.world_size.x), 80): draw_line(Vector2(x, 0), Vector2(x, balance.world_size.y), Color(0.3, 0.5, 0.6, 0.07))
 	for y in range(0, int(balance.world_size.y), 80): draw_line(Vector2(0, y), Vector2(balance.world_size.x, y), Color(0.3, 0.5, 0.6, 0.07))
 	draw_rect(rect, Color("81506b") if mode == "boss" else Color("425769"), false, 5)
