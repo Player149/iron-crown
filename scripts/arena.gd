@@ -354,6 +354,20 @@ func process_choices() -> void:
 	choice_open = true
 	ui.show_choices(choices.pop_front())
 
+# Quick class gallery for TEST1: skip grinding without touching meta progress.
+func test1_next_evolution() -> void:
+	if not is_instance_valid(player) or not player.alive or mode != "play": return
+	if player.evolutions.size() >= 3:
+		ui.notice("진화 완료", "모든 진화 단계를 체험했습니다")
+		return
+	var threshold: int = [5, 15, 25][player.evolutions.size()]
+	while player.level < threshold:
+		player.grow_level()
+	choices.clear()
+	choice_open = false
+	choices.append({"kind": "evolution", "level": threshold})
+	process_choices()
+
 func start_boss(manual: bool = false) -> void:
 	if mode != "play" or choice_open or paused: return
 	participants = fighters.filter(func(f): return f.alive and f.level >= 10)
