@@ -158,7 +158,11 @@ func show_pause(open: bool) -> void:
 	if not open:
 		modal.hide()
 		return
-	clear_modal("잠시 쉬어가기", "L: 레벨업 테스트 · B: 보스전 테스트 (Lv.10 이상)")
+	clear_modal("TEST1 / 잠시 쉬어가기", "다음 진화 즉시 체험 · L 레벨업 · B 보스전")
+	add_button("TEST1 · 다음 진화 즉시 체험", func():
+		arena.paused = false
+		modal.hide()
+		arena.test1_next_evolution())
 	add_button("계속하기", func():
 		arena.paused = false
 		modal.hide()
