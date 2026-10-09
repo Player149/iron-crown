@@ -50,6 +50,7 @@ func run() -> void:
 	near(p.stamina, 40, "Blocking prevents regeneration")
 	game.touch_block = false
 	p.blocking = true
+	p.parry_left = 0 # Verify regular block separately from TEST1 timed parry.
 	p.stamina = 5
 	enemy.stamina = 15
 	p.invuln = 0
