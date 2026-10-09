@@ -26,13 +26,15 @@
 
 ## 주의와 테스트 범위
 
+[웹에서 TEST1 열기](https://player149.github.io/iron-crown/test1/) (배포 워크플로 성공 후 접근 가능).
+
 이 브랜치는 한 화면에서 차이를 알아볼 수 있게 만든 테스트이며, 상위 진화의 **고유 수치 및 스킬이 각각 완성된 것이 아니다**. 대부분 전투 패턴은 몇 가지 공통 `combat_style` 원형을 공유하고, 직업 전용 애니메이션은 임시 연출이다.
 
 AI와의 전투만 제공하며 실제 20~25인 실시간 멀티플레이, 서버 연결, 네트워크 타이밍 보정은 구현하지 않았다.
 
 ## 테스트 및 빌드
 
-GitHub Actions 워크플로가 `test1` 브랜치의 푸시를 빌드·검증하고, 통과하면 **iron-crown-web-test1** 아티팩트로 웹 실행 파일을 올린다. 기존 공개 Pages 사이트에는 이 브랜치가 자동 배포되지 않는다.
+GitHub Actions 워크플로가 `test1` 브랜치의 푸시를 빌드·검증하고, 통과하면 **iron-crown-web-test1** 아티팩트로 웹 실행 파일을 올린다. test1 브랜치의 배포는 본편 main을 동일하게 다시 빌드하여 웹 루트에 그대로 두고, 실험판은 `/iron-crown/test1/` 하위에 별도 배포한다. 기존 본편 저장 경로와 실험판 저장 경로도 분리한다. 테스트 배포에 실패할 경우 Actions 아티팩트로 빌드물을 확인한다.
 
 - `godot --headless --path . --script res://tests/run.gd` : 기존 핵심 전투/보스 회귀 검증(새 성장 수치 반영)
 - `godot --headless --path . --script res://tests/layout.gd` : 모바일 세로·가로 UI
