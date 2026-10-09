@@ -3,10 +3,12 @@ extends Node2D
 const FighterScene = preload("res://scenes/fighter.tscn")
 const MonsterScene = preload("res://scenes/monster.tscn")
 const ProjectileScene = preload("res://scenes/projectile.tscn")
+const MinionScript = preload("res://scripts/test1_minion.gd")
 @export var balance: CrownBalance = preload("res://data/balance.tres")
 var player
 var fighters: Array = []
 var monsters: Array = []
+var minions: Array = []
 var mode: String = "menu"
 var paused: bool = false
 var elapsed: float = 0
@@ -70,6 +72,7 @@ func start_game(boost: bool = false) -> void:
 	clear_projectiles()
 	fighters.clear()
 	monsters.clear()
+	minions.clear()
 	choices.clear()
 	effects.clear()
 	mode = "play"
@@ -150,6 +153,11 @@ func _physics_process(dt: float) -> void:
 				for zone in $Zones.get_children():
 					if f.position.distance_to(zone.position) < zone.radius: add_xp(f, zone.experience_per_second * dt)
 		if active():
+			for minion in minions.duplicate():
+				if not is_instance_valid(minion) or minion.is_queued_for_deletion():
+					minions.erase(minion)
+				else: minion.tick(dt)
+		if active():
 			for p in $Projectiles.get_children():
 				if not p.is_queued_for_deletion(): p.tick(dt)
 		if boss_finish_pending:
@@ -202,6 +210,13 @@ func deal_damage(target, amount: float, source) -> float:
 		source.combat_left = balance.combat_duration
 	var reduction = target.armor / (100.0 + target.armor)
 	if target is CrownFighter and target.blocking and target.stamina > 0:
+		var guard_angle: float = absf(angle_difference(target.facing, (source.position - target.position).angle()))
+		if guard_angle < 1.35 and target.parry_left > 0 and source is CrownFighter:
+			target.parry_left = 0
+			apply_posture(source, 48, target)
+			fx_ring(target.position, 65, Color("ffd87f"), 0.34)
+			float_text(target.position, "패링!", Color("ffe7a1"))
+			return 0
 		reduction = 1 - (1 - reduction) * (1 - target.block_reduction)
 		if duel:
 			target.stamina = maxf(0, target.stamina - balance.block_cost)
@@ -211,6 +226,8 @@ func deal_damage(target, amount: float, source) -> float:
 		fx_ring(target.position, 45, Color("91dfff"), 0.2)
 	var final = maxf(1, amount * (1 - reduction))
 	target.hp -= final
+	if target is CrownFighter and target.blocking:
+		apply_posture(target, maxf(4, amount * 0.16), source)
 	if source is CrownFighter:
 		source.hp = minf(source.max_hp, source.hp + final * source.lifesteal)
 		add_xp(source, minf(2, final * 0.028))
@@ -219,6 +236,36 @@ func deal_damage(target, amount: float, source) -> float:
 	if source == player or target == player: sound("hit", player)
 	if target.hp <= 0: kill_target(target, source)
 	return final
+
+func apply_posture(target, amount: float, source) -> void:
+	if not target is CrownFighter or not target.alive or target.stagger_protection > 0: return
+	if amount <= 0: return
+	target.posture = minf(100, target.posture + amount)
+	if target.posture >= 100:
+		target.posture = 0
+		target.stagger_left = 0.48
+		target.stagger_protection = 2.0
+		target.parry_left = 0
+		target.attack_pending = false
+		target.blocking = false
+		float_text(target.position, "자세 붕괴!", Color("ffcf83"))
+		fx_ring(target.position, 48, Color("e8a761"), 0.4)
+
+func spawn_minion(source, kind: String) -> void:
+	if not is_instance_valid(source) or not source.alive or mode != "play": return
+	var owned: int = 0
+	for minion in minions:
+		if is_instance_valid(minion) and not minion.is_queued_for_deletion() and minion.owner_fighter == source:
+			owned += 1
+	if owned >= 3: return
+	var minion = MinionScript.new()
+	minion.arena = self
+	minion.owner_fighter = source
+	minion.kind = kind
+	minion.position = source.position + Vector2.from_angle(randf() * TAU) * 48
+	$Actors.add_child(minion)
+	minions.append(minion)
+	fx_ring(minion.position, 20, Color("d5b9e9"), 0.2)
 
 func kill_target(target, killer) -> void:
 	if not target.alive: return
@@ -285,18 +332,22 @@ func add_xp(f, amount: float) -> void:
 		f.grow_level()
 		if f.is_player:
 			run_gold += roundi((28 + f.level * 5) * f.gold_bonus)
-			if CrownCatalog.EVOLUTIONS.has(f.level): choices.append({"kind": "evolution", "level": f.level})
+			if f.level in [5, 15, 25]: choices.append({"kind": "evolution", "level": f.level})
 			choices.append({"kind": "stat", "level": f.level})
 			sound("level", f)
 		else:
 			CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
-			if CrownCatalog.EVOLUTIONS.has(f.level): CrownCatalog.evolve(f, CrownCatalog.EVOLUTIONS[f.level].pick_random())
+			if f.level in [5, 15, 25]:
+				var bot_options = CrownTest1Rules.options_for(f, f.level)
+				if not bot_options.is_empty(): CrownTest1Rules.evolve(f, bot_options.pick_random())
 	if f.is_player: process_choices()
 
 func advance_bot(f) -> void:
 	f.grow_level()
 	CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
-	if CrownCatalog.EVOLUTIONS.has(f.level): CrownCatalog.evolve(f, CrownCatalog.EVOLUTIONS[f.level].pick_random())
+	if f.level in [5, 15, 25]:
+		var bot_options = CrownTest1Rules.options_for(f, f.level)
+		if not bot_options.is_empty(): CrownTest1Rules.evolve(f, bot_options.pick_random())
 
 func process_choices() -> void:
 	if choices.is_empty() or choice_open or paused or not is_instance_valid(player) or not player.alive: return
@@ -319,7 +370,7 @@ func start_boss(manual: bool = false) -> void:
 	snapshots.clear()
 	for f in fighters:
 		var values = f.snapshot_stats()
-		for key in ["position", "hp", "stamina", "alive", "invuln", "combat_left", "no_hit_time", "exhausted", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
+		for key in ["position", "hp", "stamina", "alive", "invuln", "combat_left", "no_hit_time", "exhausted", "dash_left", "blocking", "dash_velocity", "cooldown", "posture", "stagger_left", "stagger_protection", "parry_left", "previous_block", "attack_pending", "attack_windup", "dash_strike", "robot_heat"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
 		snapshots.append({"fighter": f, "values": values})
 		if not participants.has(f):
 			f.alive = false
