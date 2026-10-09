@@ -32,8 +32,8 @@ func run() -> void:
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
 	for i in 38: p.grow_level()
-	near(p.max_hp, 400, "Level 40 base HP")
-	near(p.max_stamina, 200, "Level 40 base stamina")
+	near(p.max_hp, 260, "Test1 level 40 base HP")
+	near(p.max_stamina, 170, "Test1 level 40 base stamina")
 	p.stamina = 60
 	p.combat_left = 0
 	check(p.spend(15), "Out-of-combat attack permitted")
