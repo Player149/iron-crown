@@ -191,6 +191,11 @@ func collect_boxes(dt: float) -> void:
 		spawn_box()
 		replenish_left = 0.33
 
+func _unhandled_input(event: InputEvent) -> void:
+	# The survival TEST1 L/B debug shortcuts must not grant match XP or boss access.
+	if event.is_action_pressed("level_test") or event.is_action_pressed("boss_test"): return
+	super._unhandled_input(event)
+
 func _physics_process(dt: float) -> void:
 	if active():
 		round_remaining -= dt
