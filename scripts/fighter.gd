@@ -143,6 +143,7 @@ func player_control() -> void:
 		if Input.is_action_just_pressed(key): skill(key)
 
 func ai_control(dt: float) -> void:
+	if arena.has_method("ai_pickup_control") and arena.ai_pickup_control(self): return
 	ai_retarget -= dt
 	ai_block = maxf(0, ai_block - dt)
 	if ai_retarget <= 0 or not is_instance_valid(ai_target) or not arena.valid_target(self, ai_target):
