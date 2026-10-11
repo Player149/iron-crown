@@ -20,6 +20,16 @@ func _ready() -> void:
 		if Meta.player_name.is_empty(): Meta.player_name = "방랑 기사"
 		Meta.save_data()
 		arena.start_game(box.get_node("Boost").button_pressed))
+	var deathmatch_button := Button.new()
+	deathmatch_button.text = "8분 데스매치 · AI 9명 (NEW)"
+	deathmatch_button.custom_minimum_size = Vector2(0, 54)
+	box.add_child(deathmatch_button)
+	box.move_child(deathmatch_button, box.get_node("Start").get_index() + 1)
+	deathmatch_button.pressed.connect(func():
+		Meta.player_name = box.get_node("Name").text.strip_edges().left(12)
+		if Meta.player_name.is_empty(): Meta.player_name = "방랑 기사"
+		Meta.save_data()
+		get_tree().change_scene_to_file("res://scenes/deathmatch.tscn"))
 	box.get_node("Shop").pressed.connect(show_shop)
 	box.get_node("Eyebrow").text = "IRON CROWN / TEST 1 / BRANCHING EVOLUTION"
 	box.get_node("Subtitle").text = "계보 진화 · 무기별 전투 · 자세 붕괴 실험"
@@ -158,11 +168,14 @@ func show_pause(open: bool) -> void:
 	if not open:
 		modal.hide()
 		return
-	clear_modal("TEST1 / 잠시 쉬어가기", "다음 진화 즉시 체험 · L 레벨업 · B 보스전")
-	add_button("TEST1 · 다음 진화 즉시 체험", func():
-		arena.paused = false
-		modal.hide()
-		arena.test1_next_evolution())
+	if arena.has_method("is_deathmatch") and arena.is_deathmatch():
+		clear_modal("데스매치 일시정지", "8분 매치 · 부활 시 XP 일부 감소")
+	else:
+		clear_modal("TEST1 / 잠시 쉬어가기", "다음 진화 즉시 체험 · L 레벨업 · B 보스전")
+		add_button("TEST1 · 다음 진화 즉시 체험", func():
+			arena.paused = false
+			modal.hide()
+			arena.test1_next_evolution())
 	add_button("계속하기", func():
 		arena.paused = false
 		modal.hide()
@@ -171,7 +184,7 @@ func show_pause(open: bool) -> void:
 		Meta.muted = not Meta.muted
 		Meta.save_data()
 		show_pause(true))
-	add_button("메뉴로 · 골드 보관", arena.return_menu)
+	add_button("TEST1 메뉴로" if arena.has_method("is_deathmatch") else "메뉴로 · 골드 보관", arena.return_menu)
 
 func show_result(title: String, details: String) -> void:
 	clear_modal(title, details)
