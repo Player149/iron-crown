@@ -43,6 +43,9 @@ jobs:
       - name: Verify TEST1 branching and posture
         if: github.ref == 'refs/heads/test1'
         run: godot --headless --path . --script res://tests/test1.gd
+      - name: Verify 8-minute AI deathmatch mode
+        if: github.ref == 'refs/heads/test1'
+        run: godot --headless --path . --script res://tests/deathmatch.gd
       - name: Export Web
         run: |
           mkdir -p build/web
