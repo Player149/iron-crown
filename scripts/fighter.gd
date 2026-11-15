@@ -40,6 +40,7 @@ var max_stamina: float = 100.0
 var guard_requested: bool = false
 var guard_phase: String = "idle" # idle, raise, hold, lower
 var guard_time: float = 0.0
+var perfect_guard_left: float = 0.0
 var attack_lock: float = 0.0
 var combat_left: float = 0
 var no_hit_time: float = 99
@@ -167,43 +168,41 @@ func spend_stamina(cost: float) -> bool:
 
 func advance_guard(dt: float) -> void:
 	if not can_act(): guard_requested = false
+	perfect_guard_left = maxf(0.0, perfect_guard_left - dt)
 	if guard_phase == "idle" and guard_requested and attack_lock <= 0 and dash_left <= 0:
 		guard_phase = "raise"
 		play_guard_animation("guard_raise", arena.balance.guard_windup)
-	elif guard_phase == "raise":
-		guard_time -= dt
-		if guard_time <= 0:
-			finish_guard_animation("guard_raise")
-			guard_phase = "hold"
-			blocking = true
-			if not guard_requested: lower_guard()
 	elif guard_phase == "hold":
-		stamina = maxf(0, stamina - arena.balance.guard_drain_per_second * dt)
+		stamina = maxf(0.0, stamina - arena.balance.guard_drain_per_second * dt)
 		if not guard_requested or stamina <= 0: lower_guard()
-	elif guard_phase == "lower":
-		guard_time -= dt
-		if guard_time <= 0:
-			guard_phase = "idle"
-			finish_guard_animation("guard_lower")
 
 func play_guard_animation(animation_name: String, duration: float) -> void:
-	# One duration controls both the combat lock and the editable visual timeline.
+	# The animation method track, not this timer, commits guard state changes.
 	guard_time = maxf(0.01, duration)
 	var animation: Animation = $AnimationPlayer.get_animation(animation_name)
 	$AnimationPlayer.play(animation_name, 0.0, animation.length / guard_time)
 	$AnimationPlayer.advance(0.0)
 
-func finish_guard_animation(animation_name: String) -> void:
-	# Commit the authored end pose even when a large tick finishes the phase.
-	var animation: Animation = $AnimationPlayer.get_animation(animation_name)
-	$AnimationPlayer.play(animation_name, 0.0)
-	$AnimationPlayer.seek(animation.length, true)
-	$AnimationPlayer.pause()
+# Invoked by the guard_raise AnimationPlayer method track.
+func on_guard_raised() -> void:
+	if guard_phase != "raise": return
+	guard_phase = "hold"
+	blocking = true
+	perfect_guard_left = arena.balance.perfect_guard_window
+	if not guard_requested: lower_guard()
+
+# Invoked by the guard_lower AnimationPlayer method track.
+func on_guard_lowered() -> void:
+	if guard_phase != "lower": return
+	guard_phase = "idle"
+	blocking = false
+	perfect_guard_left = 0.0
 
 func lower_guard() -> void:
 	if guard_phase != "hold" and guard_phase != "raise": return
 	guard_phase = "lower"
 	blocking = false
+	perfect_guard_left = 0.0
 	play_guard_animation("guard_lower", arena.balance.guard_recovery)
 
 func reset_guard() -> void:
@@ -211,9 +210,10 @@ func reset_guard() -> void:
 	guard_time = 0
 	guard_requested = false
 	blocking = false
+	perfect_guard_left = 0.0
 	attack_lock = 0
 	$AnimationPlayer.stop()
-	finish_guard_animation("guard_lower")
+	$Visual/Shield.position = Vector2(12, 25)
 
 func absorb_guard_hit() -> bool:
 	if not blocking or guard_phase != "hold": return false
@@ -221,6 +221,9 @@ func absorb_guard_hit() -> bool:
 		lower_guard()
 		return false
 	return true
+
+func is_perfect_guard() -> bool:
+	return blocking and guard_phase == "hold" and perfect_guard_left > 0.0
 
 func attack() -> void:
 	if not can_act() or blocking or guard_requested or guard_phase != "idle" or attack_lock > 0 or cooldown.attack > 0: return
