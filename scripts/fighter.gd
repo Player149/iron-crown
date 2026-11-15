@@ -37,6 +37,8 @@ var invuln: float = 0
 var blocking: bool = false
 var stamina: float = 100.0
 var max_stamina: float = 100.0
+var exhaustion_left: float = 0.0
+var damage_contributors: Dictionary = {} # attacker instance ID -> most recent hit time
 var guard_requested: bool = false
 var guard_phase: String = "idle" # idle, raise, hold, lower
 var guard_time: float = 0.0
@@ -93,20 +95,22 @@ func tick(dt: float) -> void:
 		cooldown[key] = maxf(0, cooldown[key] - dt)
 	invuln = maxf(0, invuln - dt)
 	attack_lock = maxf(0, attack_lock - dt)
+	if exhaustion_left > 0.0: exhaustion_left = maxf(0.0, exhaustion_left - dt)
+	elif stamina <= 0.0: trigger_exhaustion()
 	update_groggy(dt)
 	combat_left = maxf(0, combat_left - dt)
 	no_hit_time += dt
 	guard_requested = false
 	velocity = Vector2.ZERO
-	if groggy_left <= 0:
+	if can_act():
 		if is_player:
 			player_control()
 		else:
 			ai_control(dt)
 	advance_guard(dt)
-	if guard_phase == "idle" and attack_lock <= 0:
+	if guard_phase == "idle" and attack_lock <= 0 and exhaustion_left <= 0.0:
 		stamina = minf(max_stamina, stamina + arena.balance.stamina_regen * dt)
-	if dash_left > 0 and groggy_left <= 0:
+	if dash_left > 0 and can_act():
 		dash_left -= dt
 		velocity = dash_velocity
 		arena.fx_ring(position, 12, Color("79dbf4") if is_player and Meta.rune_level("frost") > 0 else tint, 0.2)
@@ -159,22 +163,42 @@ func ai_control(dt: float) -> void:
 	if distance > 210 and distance < 440 and randf() < dt * 0.24: dash(offset.normalized())
 
 func can_act() -> bool:
-	return alive and groggy_left <= 0
+	return alive and groggy_left <= 0 and exhaustion_left <= 0.0
+
+func trigger_exhaustion() -> void:
+	if exhaustion_left > 0.0 or not alive: return
+	exhaustion_left = arena.balance.exhaustion_duration
+	stamina = 0.0
+	reset_guard()
+	dash_left = 0.0
+	velocity = Vector2.ZERO
+	pending_skills.clear()
+	$AnimationPlayer.stop()
+	$Visual.position = Vector2.ZERO
+	$Visual/WeaponPivot.rotation = 0.0
+	for animator in ability_players.values(): animator.stop()
+	arena.float_text(position, "탈진!", Color("ff9f70"))
 
 func spend_stamina(cost: float) -> bool:
-	if stamina < cost: return false
-	stamina -= cost
+	if not can_act() or stamina < cost: return false
+	stamina = maxf(0.0, stamina - cost)
+	if stamina <= 0.0: trigger_exhaustion()
 	return true
 
 func advance_guard(dt: float) -> void:
-	if not can_act(): guard_requested = false
+	if not can_act():
+		guard_requested = false
+		return
 	perfect_guard_left = maxf(0.0, perfect_guard_left - dt)
 	if guard_phase == "idle" and guard_requested and attack_lock <= 0 and dash_left <= 0:
 		guard_phase = "raise"
 		play_guard_animation("guard_raise", arena.balance.guard_windup)
 	elif guard_phase == "hold":
-		stamina = maxf(0.0, stamina - arena.balance.guard_drain_per_second * dt)
-		if not guard_requested or stamina <= 0: lower_guard()
+		if not guard_requested:
+			lower_guard()
+		else:
+			stamina = maxf(0.0, stamina - arena.balance.guard_drain_per_second * dt)
+			if stamina <= 0.0: trigger_exhaustion()
 
 func play_guard_animation(animation_name: String, duration: float) -> void:
 	# The animation method track, not this timer, commits guard state changes.
@@ -218,7 +242,7 @@ func reset_guard() -> void:
 func absorb_guard_hit() -> bool:
 	if not blocking or guard_phase != "hold": return false
 	if not spend_stamina(arena.balance.guard_hit_cost):
-		lower_guard()
+		if exhaustion_left <= 0.0: lower_guard()
 		return false
 	return true
 
@@ -340,7 +364,7 @@ func update_visual() -> void:
 	$Visual.rotation = facing
 	$Visual.scale = Vector2.ONE * body_scale
 	$Visual/Shield.modulate = Color("bfefff") if blocking else (Color("aebccc") if guard_phase == "raise" else Color("6d798b"))
-	$Visual/Body.modulate = Color("ffd47b") if boss_flag else tint
+	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else tint)
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
 	queue_redraw()
