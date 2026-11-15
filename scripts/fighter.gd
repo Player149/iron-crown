@@ -7,6 +7,11 @@ extends CharacterBody2D
 @export var speed: float = 178.0
 @export var tint: Color = Color("78b4df")
 @export var attack_range_override: float = 0.0
+@export var definition: CrownCharacterDefinition = preload("res://data/characters/knight.tres")
+var abilities: Dictionary = {}
+var ability_players: Dictionary = {}
+var pending_skills: Dictionary = {}
+var attack_target_limit: int = 2
 var arena
 var level: int = 1
 var xp: float = 0
@@ -52,6 +57,16 @@ func _ready() -> void:
 	hp = max_hp
 	max_stamina = arena.balance.starting_stamina
 	stamina = max_stamina
+	for key in definition.multipliers: set(key, get(key) * definition.multipliers[key])
+	for key in definition.additions: set(key, get(key) + definition.additions[key])
+	hp = max_hp
+	stamina = max_stamina
+	attack_target_limit = definition.attack_target_limit
+	var library = $AnimationPlayer.get_animation_library("").duplicate()
+	$AnimationPlayer.remove_animation_library("")
+	$AnimationPlayer.add_animation_library("", library)
+	if definition.attack_animation != null: library.add_animation("swing", definition.attack_animation)
+	if definition.ability != null: equip_ability(definition.skill_slot, definition.ability)
 	base_stats = snapshot_stats()
 	if is_player:
 		Meta.apply_runes(self)
@@ -145,7 +160,7 @@ func spend(amount: float) -> bool:
 func attack() -> void:
 	if not can_act() or blocking or cooldown.attack > 0: return
 	if not spend(arena.balance.attack_cost): return
-	cooldown.attack = 0.56 / attack_speed
+	cooldown.attack = definition.attack_cooldown / attack_speed
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
 
@@ -161,7 +176,7 @@ func resolve_attack_hit() -> void:
 			arena.deal_damage(target, damage * (1.7 if critical else 1.0), self)
 			target.position += offset.normalized() * 5
 			count += 1
-			if exhausted > 0 or (count >= 2 and not evolutions.has("reaper")): break
+			if exhausted > 0 or (attack_target_limit > 0 and count >= attack_target_limit): break
 	arena.add_xp(self, 0.35)
 
 func dash(direction: Vector2 = Vector2.ZERO) -> void:
@@ -173,39 +188,39 @@ func dash(direction: Vector2 = Vector2.ZERO) -> void:
 	cooldown.dash = 2.15 * dash_mult
 	arena.sound("dash", self)
 
+func equip_ability(slot: String, ability: CrownAbility) -> void:
+	if not cooldown.has(slot) or ability.animation == null: return
+	abilities[slot] = ability
+	if not ability_players.has(slot):
+		var animator = AnimationPlayer.new()
+		animator.name = "Skill_" + slot.to_upper()
+		add_child(animator)
+		ability_players[slot] = animator
+	var animator = ability_players[slot]
+	animator.stop()
+	pending_skills.erase(slot)
+	if animator.has_animation_library(""): animator.remove_animation_library("")
+	var library = AnimationLibrary.new()
+	library.add_animation("cast", ability.animation)
+	animator.add_animation_library("", library)
+
 func skill(key: String) -> void:
-	var tier = {"e": 1, "r": 2, "q": 3}[key]
-	if not can_act() or evolutions.size() < tier or cooldown[key] > 0: return
-	if not spend(arena.balance.skill_cost): return
-	cooldown[key] = {"e": 6.5, "r": 11.0, "q": 23.0}[key]
-	arena.add_xp(self, {"e": 1.3, "r": 2.0, "q": 3.0}[key])
+	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0: return
+	var ability: CrownAbility = abilities[key]
+	if not spend(ability.stamina_cost): return
+	cooldown[key] = ability.cooldown
+	pending_skills[key] = ability
+	ability_players[key].play("cast")
 	arena.sound("skill", self)
-	var power = damage * skill_power
-	if key == "e":
-		if evolutions.has("guardian"):
-			arena.area_attack(self, 135, power * 1.25)
-			invuln = maxf(invuln, 0.34)
-		else:
-			var count = 3 if evolutions.has("berserker") else 1
-			for i in count: arena.shoot(self, facing + (i - (count - 1) / 2.0) * 0.18, 420, power * 1.2, 1.15, 2 if evolutions.has("duelist") else 1)
-	elif key == "r":
-		if evolutions.has("lancer"):
-			dash_left = 0.38
-			dash_velocity = Vector2.from_angle(facing) * 850
-			invuln = 0.42
-			arena.area_attack(self, 115, power * 1.65)
-		elif evolutions.has("slayer"):
-			for i in range(-2, 3): arena.shoot(self, facing + i * 0.13, 520, power * 0.78, 1.3)
-		else: arena.area_attack(self, 205, power * 1.5)
-	else:
-		if evolutions.has("storm"):
-			for i in 12: arena.shoot(self, i * TAU / 12, 490, power * 0.95, 1.4, 2)
-		elif evolutions.has("colossus"):
-			arena.area_attack(self, 310, power * 2.15)
-			invuln = 1.1
-		else:
-			arena.area_attack(self, 230, power * 2.6)
-			hp = minf(max_hp, hp + max_hp * 0.18)
+
+## Called by the ability Animation method track, not by input or a timer.
+func resolve_skill_hit(key: String) -> void:
+	if not pending_skills.has(key): return
+	var ability: CrownAbility = pending_skills[key]
+	pending_skills.erase(key)
+	if not can_act() or not arena.active(): return
+	ability.execute(self)
+	arena.add_xp(self, ability.experience)
 
 func exhaust_if_empty() -> void:
 	if stamina > 0 or exhausted > 0: return

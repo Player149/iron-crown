@@ -1,0 +1,14 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/reaper.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "reaper"
+title = "핏빛 왕"
+description = "Q 핏빛 왕관 · 공격 +18%, 흡혈 +6%p"
+unlock_level = 25
+multipliers = {"damage": 1.18}
+additions = {"lifesteal": 0.06}
+skill_slot = "q"
+ability = ExtResource("2")
+attack_target_limit = 0

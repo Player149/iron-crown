@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/sentinel.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "sentinel"
+title = "성채 수호자"
+description = "R 대지 강타 · 방어 +12, 막기 강화"
+unlock_level = 15
+multipliers = {}
+additions = {"armor": 12, "block_reduction": 0.08}
+skill_slot = "r"
+ability = ExtResource("2")

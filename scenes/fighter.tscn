@@ -1,72 +1,144 @@
-[gd_scene load_steps=12 format=3]
-[ext_resource type="Script" path="res://scripts/fighter.gd" id="1"]
-[ext_resource type="Texture2D" path="res://assets/knight.svg" id="2"]
-[ext_resource type="Texture2D" path="res://assets/sword.svg" id="3"]
-[ext_resource type="Texture2D" path="res://assets/shield.svg" id="4"]
-[ext_resource type="FontFile" path="res://assets/NotoSansKR.ttf" id="5"]
+[gd_scene format=3 uid="uid://bby3uw6vl8tuo"]
+
+[ext_resource type="Script" uid="uid://dch4ekjwaqedh" path="res://scripts/fighter.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://dmvmclop6ushf" path="res://assets/knight.svg" id="2"]
+[ext_resource type="Texture2D" uid="uid://dsgi40fmqcr2m" path="res://assets/sword.svg" id="3"]
+[ext_resource type="Texture2D" uid="uid://cn8uhetxh0fep" path="res://assets/shield.svg" id="4"]
+[ext_resource type="FontFile" uid="uid://c8ung84ge5tsm" path="res://assets/NotoSansKR.ttf" id="5"]
+
 [sub_resource type="CircleShape2D" id="Body"]
 radius = 25.0
+
 [sub_resource type="CircleShape2D" id="Attack"]
 radius = 84.0
+
 [sub_resource type="Animation" id="Reset"]
 length = 0.001
 tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
 tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
-tracks/0/keys = {"times": PackedFloat32Array(0), "transitions": PackedFloat32Array(1), "update": 0, "values": [0.0]}
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Visual:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+
 [sub_resource type="Animation" id="Swing"]
 resource_name = "swing"
-length = 0.32
+length = 0.42
+step = 0.01
 tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
 tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
-tracks/0/keys = {"times": PackedFloat32Array(0, 0.08, 0.2, 0.32), "transitions": PackedFloat32Array(1, 1, 1, 1), "update": 0, "values": [-1.1, -0.8, 0.9, 0.0]}
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.2, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [-1.1, -0.8, 0.9, 0.0]
+}
 tracks/1/type = "method"
+tracks/1/imported = false
+tracks/1/enabled = true
 tracks/1/path = NodePath(".")
-tracks/1/keys = {"times": PackedFloat32Array(0.2), "transitions": PackedFloat32Array(1), "values": [{"args": [], "method": &"resolve_attack_hit"}]}
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0.2),
+"transitions": PackedFloat32Array(1),
+"values": [{"args": [], "method": &"resolve_attack_hit"}]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Visual:position")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0.08, 0.19, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(35, 0), Vector2(0, 0)]
+}
+
 [sub_resource type="AnimationLibrary" id="Anims"]
-_data = {"RESET": SubResource("Reset"), "swing": SubResource("Swing")}
+_data = {
+&"RESET": SubResource("Reset"),
+&"swing": SubResource("Swing")
+}
+
 [sub_resource type="Theme" id="KnightTheme"]
 default_font = ExtResource("5")
 default_font_size = 13
-[node name="Fighter" type="CharacterBody2D"]
-collision_layer = 1
+
+[node name="Fighter" type="CharacterBody2D" unique_id=1975722111]
 collision_mask = 0
 script = ExtResource("1")
-[node name="BodyShape" type="CollisionShape2D" parent="."]
+
+[node name="BodyShape" type="CollisionShape2D" parent="." unique_id=1330107527]
 shape = SubResource("Body")
-[node name="Visual" type="Node2D" parent="."]
-[node name="Body" type="Sprite2D" parent="Visual"]
-texture = ExtResource("2")
+
+[node name="Visual" type="Node2D" parent="." unique_id=1812961861]
+
+[node name="Body" type="Sprite2D" parent="Visual" unique_id=1142783322]
 scale = Vector2(0.8, 0.8)
-[node name="Shield" type="Sprite2D" parent="Visual"]
+texture = ExtResource("2")
+
+[node name="Shield" type="Sprite2D" parent="Visual" unique_id=515683880]
 position = Vector2(12, 25)
-texture = ExtResource("4")
 scale = Vector2(0.65, 0.65)
-[node name="WeaponPivot" type="Node2D" parent="Visual"]
-[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot"]
+texture = ExtResource("4")
+
+[node name="WeaponPivot" type="Node2D" parent="Visual" unique_id=583824191]
+
+[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot" unique_id=1827909850]
 position = Vector2(48, -15)
-texture = ExtResource("3")
 scale = Vector2(0.7, 0.7)
-[node name="AttackArea" type="Area2D" parent="."]
+texture = ExtResource("3")
+
+[node name="AttackArea" type="Area2D" parent="." unique_id=1810657679]
 collision_layer = 0
 collision_mask = 0
 monitoring = false
-[node name="Shape" type="CollisionShape2D" parent="AttackArea"]
+
+[node name="Shape" type="CollisionShape2D" parent="AttackArea" unique_id=23688336]
 shape = SubResource("Attack")
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {&"": SubResource("Anims")}
-[node name="NameLabel" type="Label" parent="."]
-theme = SubResource("KnightTheme")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=2104833756]
+libraries/ = SubResource("Anims")
+autoplay = &"swing"
+
+[node name="NameLabel" type="Label" parent="." unique_id=1179873608]
 offset_left = -90.0
 offset_top = -64.0
 offset_right = 90.0
 offset_bottom = -40.0
+theme = SubResource("KnightTheme")
 theme_override_font_sizes/font_size = 13
 horizontal_alignment = 1
-mouse_filter = 2
-[node name="Health" type="ProgressBar" parent="."]
+
+[node name="Health" type="ProgressBar" parent="." unique_id=715070890]
 offset_left = -30.0
 offset_top = -38.0
 offset_right = 30.0
 offset_bottom = -31.0
-show_percentage = false
 mouse_filter = 2
+show_percentage = false

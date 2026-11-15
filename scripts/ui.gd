@@ -120,7 +120,7 @@ func add_button(text: String, callback: Callable, parent: Node = null) -> Button
 func show_choices(event: Dictionary) -> void:
 	var evolution = event.kind == "evolution"
 	clear_modal("진화할 계통을 선택하세요" if evolution else "능력 하나를 선택하세요", "LEVEL %d  ·  이번 생존 동안 유지됩니다" % event.level)
-	var options = CrownCatalog.EVOLUTIONS[event.level].duplicate() if evolution else CrownCatalog.STATS.duplicate()
+	var options = CrownCatalog.options_for(arena.player, event.level) if evolution else CrownCatalog.STATS.duplicate()
 	if not evolution:
 		options.shuffle()
 		options = options.slice(0, 3)

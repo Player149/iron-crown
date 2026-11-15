@@ -111,6 +111,13 @@ func run() -> void:
 	p.skill("r")
 	p.skill("q")
 	check(p.cooldown.e > 0 and p.cooldown.r > 0 and p.cooldown.q > 0, "All evolved skills execute")
+	check(game.get_node("Projectiles").get_child_count() == 0, "Skill input waits for animation event")
+	p.ability_players.e.advance(0.201)
+	await process_frame
+	check(game.get_node("Projectiles").get_child_count() == 1, "Skill animation event launches projectile")
+	p.resolve_skill_hit("e")
+	check(game.get_node("Projectiles").get_child_count() == 1, "Repeated event cannot duplicate consumed cast")
+	check(game.spawn_fighter(false).abilities.is_empty(), "Equipped skills are isolated per fighter")
 	var hp_before: float = p.hp
 	var damage_before: float = p.damage
 	game.start_boss(true)

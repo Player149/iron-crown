@@ -1,6 +1,6 @@
 extends Node2D
 
-const FighterScene = preload("res://scenes/fighter.tscn")
+const FighterScene = preload("res://scenes/characters/base_knight.tscn")
 const MonsterScene = preload("res://scenes/monster.tscn")
 const ProjectileScene = preload("res://scenes/projectile.tscn")
 @export var balance: CrownBalance = preload("res://data/balance.tres")
@@ -285,18 +285,18 @@ func add_xp(f, amount: float) -> void:
 		f.grow_level()
 		if f.is_player:
 			run_gold += roundi((28 + f.level * 5) * f.gold_bonus)
-			if CrownCatalog.EVOLUTIONS.has(f.level): choices.append({"kind": "evolution", "level": f.level})
+			if not CrownCatalog.options_for(f, f.level).is_empty(): choices.append({"kind": "evolution", "level": f.level})
 			choices.append({"kind": "stat", "level": f.level})
 			sound("level", f)
 		else:
 			CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
-			if CrownCatalog.EVOLUTIONS.has(f.level): CrownCatalog.evolve(f, CrownCatalog.EVOLUTIONS[f.level].pick_random())
+			if not CrownCatalog.options_for(f, f.level).is_empty(): CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 	if f.is_player: process_choices()
 
 func advance_bot(f) -> void:
 	f.grow_level()
 	CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
-	if CrownCatalog.EVOLUTIONS.has(f.level): CrownCatalog.evolve(f, CrownCatalog.EVOLUTIONS[f.level].pick_random())
+	if not CrownCatalog.options_for(f, f.level).is_empty(): CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 
 func process_choices() -> void:
 	if choices.is_empty() or choice_open or paused or not is_instance_valid(player) or not player.alive: return

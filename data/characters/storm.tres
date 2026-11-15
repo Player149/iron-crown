@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/storm.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "storm"
+title = "폭풍 기사"
+description = "Q 검의 폭풍 · 기술 위력 +20%"
+unlock_level = 25
+multipliers = {"skill_power": 1.2}
+additions = {}
+skill_slot = "q"
+ability = ExtResource("2")

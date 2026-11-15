@@ -74,7 +74,7 @@
 
 - `arena.gd`: 게임 흐름, 피해, XP, 보스, 라운드 보상.
 - `fighter.gd`: 이동, AI, 평타·스킬, HP/ST, 회복, 캐릭터 시각 표현.
-- `catalog.gd`: 스탯/룬/진화 정의와 효과. 새 항목은 표시용 배열과 적용 로직을 함께 변경.
+- `catalog.gd`: 스탯/룬/진화 정의와 효과. 진화는 data/characters/roster.tres에서 등록하며 기술은 data/abilities/에서 설정. 제작 절차는 CHARACTER_AUTHORING.md 참고.
 - `meta.gd`: 로컬 영구 진행. 이전 HTML 세이브 최초 가져오기.
 - `ui.gd`: 메뉴, 선택창, 상점, HUD. 정적 레이아웃은 ui.tscn.
 - `touch_controls.gd`: 멀티터치 이동 및 전투 입력. 키보드와 분리.

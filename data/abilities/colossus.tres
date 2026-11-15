@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/ability_definition.gd" id="1"]
+[sub_resource type="Animation" id="Cast"]
+resource_name = "cast"
+length = 0.4
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {"times": PackedFloat32Array(0.2), "transitions": PackedFloat32Array(1), "values": [{"args": ["q"], "method": &"resolve_skill_hit"}]}
+[resource]
+script = ExtResource("1")
+animation = SubResource("Cast")
+cooldown = 23.0
+experience = 3.0
+power = 2.15
+radius = 310
+invulnerability = 1.1

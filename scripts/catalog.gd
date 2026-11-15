@@ -13,11 +13,23 @@ const STATS = [
 	["dash", "짧은 발놀림", "대시 쿨타임 -14%"],
 	["stamina", "지구력 훈련", "최대 스태미나 +18"]
 ]
-const EVOLUTIONS = {
-	5: [["duelist", "결투가", "E 관통 검기 · 공속 +15%, 이속 +7%"], ["guardian", "수호 기사", "E 방패 폭발 · 체력 +22%, 방어 +7"], ["berserker", "광전사", "E 삼중 검기 · 공격 +20%, 체력 -6%"]],
-	15: [["lancer", "창기병", "R 돌진 · 이속 +10%, 공격 +8%"], ["sentinel", "성채 수호자", "R 대지 강타 · 방어 +12, 막기 강화"], ["slayer", "학살자", "R 절멸의 칼날 · 치명타 +10%p, 공속 +8%"]],
-	25: [["storm", "폭풍 기사", "Q 검의 폭풍 · 기술 위력 +20%"], ["colossus", "철의 거신", "Q 철의 심판 · 체력 +30%, 크기 증가"], ["reaper", "핏빛 왕", "Q 핏빛 왕관 · 공격 +18%, 흡혈 +6%p"]]
-}
+const ROSTER = preload("res://data/characters/roster.tres")
+static var EVOLUTIONS: Dictionary = evolution_table()
+
+static func evolution_table() -> Dictionary:
+	var result = {}
+	for definition in ROSTER.characters:
+		if definition.unlock_level <= 1: continue
+		if not result.has(definition.unlock_level): result[definition.unlock_level] = []
+		result[definition.unlock_level].append([definition.id, definition.title, definition.description])
+	return result
+
+static func options_for(f, level: int) -> Array:
+	var previous = f.evolutions.back() if not f.evolutions.is_empty() else f.definition.id
+	return EVOLUTIONS.get(level, []).filter(func(row):
+		var d = ROSTER.find(row[0])
+		return d.parent_ids.is_empty() or d.parent_ids.has(previous))
+
 const RUNES = [
 	["edge", "예리한 검날", "공격력 +4% / 레벨"],
 	["heart", "거인의 심장", "시작 최대 체력 +5% / 레벨"],
@@ -48,34 +60,17 @@ static func apply_stat(f, id: String) -> void:
 			f.stamina = minf(f.max_stamina, f.stamina + 18)
 
 static func evolve(f, choice: Array) -> void:
-	f.evolutions.append(choice[0])
-	f.class_name_text = choice[1]
-	match choice[0]:
-		"duelist":
-			f.attack_speed *= 1.15
-			f.speed *= 1.07
-		"guardian":
-			f.hp += f.max_hp * 0.22
-			f.max_hp *= 1.22
-			f.armor += 7
-		"berserker":
-			f.damage *= 1.2
-			f.max_hp *= 0.94
-			f.hp = minf(f.hp, f.max_hp)
-		"lancer":
-			f.speed *= 1.1
-			f.damage *= 1.08
-		"sentinel":
-			f.armor += 12
-			f.block_reduction = minf(0.82, f.block_reduction + 0.08)
-		"slayer":
-			f.crit += 0.1
-			f.attack_speed *= 1.08
-		"storm": f.skill_power *= 1.2
-		"colossus":
-			f.hp += f.max_hp * 0.3
-			f.max_hp *= 1.3
-			f.body_scale *= 1.12
-		"reaper":
-			f.damage *= 1.18
-			f.lifesteal += 0.06
+	var d = ROSTER.find(choice[0])
+	if d == null or f.evolutions.has(d.id): return
+	if not options_for(f, d.unlock_level).any(func(row): return row[0] == d.id): return
+	f.evolutions.append(d.id)
+	f.class_name_text = d.title
+	var old_hp = f.max_hp
+	for key in d.multipliers: f.set(key, f.get(key) * d.multipliers[key])
+	for key in d.additions: f.set(key, f.get(key) + d.additions[key])
+	f.hp = minf(f.max_hp, f.hp + maxf(0, f.max_hp - old_hp))
+	f.block_reduction = minf(0.82, f.block_reduction)
+	f.attack_target_limit = d.attack_target_limit
+	if d.attack_animation != null:
+		f.get_node("AnimationPlayer").get_animation_library("").add_animation("swing", d.attack_animation)
+	if d.ability != null: f.equip_ability(d.skill_slot, d.ability)

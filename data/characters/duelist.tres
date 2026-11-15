@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/duelist.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "duelist"
+title = "결투가"
+description = "E 관통 검기 · 공속 +15%, 이속 +7%"
+unlock_level = 5
+multipliers = {"attack_speed": 1.15, "speed": 1.07}
+additions = {}
+skill_slot = "e"
+ability = ExtResource("2")

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/lancer.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "lancer"
+title = "창기병"
+description = "R 돌진 · 이속 +10%, 공격 +8%"
+unlock_level = 15
+multipliers = {"speed": 1.1, "damage": 1.08}
+additions = {}
+skill_slot = "r"
+ability = ExtResource("2")

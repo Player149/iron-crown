@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/guardian.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "guardian"
+title = "수호 기사"
+description = "E 방패 폭발 · 체력 +22%, 방어 +7"
+unlock_level = 5
+multipliers = {"max_hp": 1.22}
+additions = {"armor": 7}
+skill_slot = "e"
+ability = ExtResource("2")

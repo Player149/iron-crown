@@ -1,0 +1,13 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://data/abilities/berserker.tres" id="2"]
+[resource]
+script = ExtResource("1")
+id = "berserker"
+title = "광전사"
+description = "E 삼중 검기 · 공격 +20%, 체력 -6%"
+unlock_level = 5
+multipliers = {"damage": 1.2, "max_hp": 0.94}
+additions = {}
+skill_slot = "e"
+ability = ExtResource("2")

@@ -56,3 +56,7 @@ python3 -m http.server 8080 --directory build/web
 기획 기준: [Iron Crown Notion](https://app.notion.com/p/3deea58678318054b21ee776c2e7c7e8). 이후 변경 시 Notion과 이 프로젝트 문서를 함께 최신화합니다.
 
 폰트: Noto Sans KR (SIL OFL, `assets/OFL.txt`). 원본 Google Fonts 글꼴의 한글·라틴 문자, 굵기 500을 포함한 경량 파일입니다.
+
+## 캐릭터·스킬 제작
+
+기본 캐릭터 씬에서 시작하는 제작 흐름, 진화 계보 리소스와 애니메이션 이벤트 설정은 [캐릭터 제작 안내](docs/CHARACTER_AUTHORING.md)를 참고하세요. 현재 본편의 9개 진화와 기술은 `data/characters/`, `data/abilities/`로 분리되어 있습니다.
