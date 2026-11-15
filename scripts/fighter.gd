@@ -168,10 +168,9 @@ func spend_stamina(cost: float) -> bool:
 func advance_guard(dt: float) -> void:
 	if not can_act(): guard_requested = false
 	if guard_phase == "idle" and guard_requested and attack_lock <= 0 and dash_left <= 0:
-		if spend_stamina(arena.balance.guard_start_cost):
-			guard_phase = "raise"
-			guard_time = arena.balance.guard_windup
-			$AnimationPlayer.play("guard_raise")
+		guard_phase = "raise"
+		guard_time = arena.balance.guard_windup
+		$AnimationPlayer.play("guard_raise")
 	elif guard_phase == "raise":
 		guard_time -= dt
 		if guard_time <= 0:
