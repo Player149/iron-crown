@@ -37,7 +37,8 @@ func run() -> void:
 	var hp_before_swing = attack_target.hp
 	p.attack()
 	near(attack_target.hp, hp_before_swing, "Attack waits for swing hit timing")
-	p._process(0.201)
+	p.get_node("AnimationPlayer").advance(0.201)
+	await process_frame
 	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
 	p.hp = 20
 	p.grow_level()

@@ -46,7 +46,6 @@ var ai_target
 var ai_retarget: float = 0
 var ai_block: float = 0
 var respawn_timer: float = 0
-var attack_hit_delay: float = -1.0
 
 func _ready() -> void:
 	max_hp = arena.balance.starting_hp
@@ -93,16 +92,6 @@ func tick(dt: float) -> void:
 	if no_hit_time >= arena.balance.regen_delay:
 		hp = minf(max_hp, hp + max_hp * arena.balance.health_regen * dt)
 	update_visual()
-
-func _process(dt: float) -> void:
-	if attack_hit_delay < 0: return
-	if not arena.active():
-		attack_hit_delay = -1.0
-		return
-	attack_hit_delay -= dt
-	if attack_hit_delay <= 0:
-		attack_hit_delay = -1.0
-		resolve_attack_hit()
 
 func player_control() -> void:
 	var move = Input.get_vector("left", "right", "up", "down") + arena.touch_move
@@ -157,12 +146,11 @@ func attack() -> void:
 	if not can_act() or blocking or cooldown.attack > 0: return
 	if not spend(arena.balance.attack_cost): return
 	cooldown.attack = 0.56 / attack_speed
-	attack_hit_delay = 0.2 / attack_speed
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
 
 func resolve_attack_hit() -> void:
-	if not can_act() or blocking: return
+	if not can_act() or blocking or not arena.active(): return
 	var reach = (attack_range_override if attack_range_override > 0 else arena.balance.attack_range) * body_scale
 	var count = 0
 	arena.fx_ring(position + Vector2.from_angle(facing) * 50, reach * 0.5, attack_color(), 0.15)
