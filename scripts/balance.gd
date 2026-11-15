@@ -17,6 +17,7 @@ extends Resource
 @export_category("Stamina - timed combat")
 @export var stamina_max: float = 100.0
 @export var stamina_regen: float = 35.0
+@export var exhaustion_duration: float = 1.0
 @export var attack_stamina_cost: float = 10.0
 @export var dash_stamina_cost: float = 22.0
 @export var guard_start_cost: float = 0.0
