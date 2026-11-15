@@ -200,17 +200,15 @@ func deal_damage(target, amount: float, source) -> float:
 	if duel:
 		target.combat_left = balance.combat_duration
 		source.combat_left = balance.combat_duration
+	var was_blocking = target is CrownFighter and target.blocking and target.groggy_left <= 0
 	var reduction = target.armor / (100.0 + target.armor)
-	if target is CrownFighter and target.blocking and target.stamina > 0:
+	if target is CrownFighter and target.blocking and target.groggy_left <= 0:
 		reduction = 1 - (1 - reduction) * (1 - target.block_reduction)
-		if duel:
-			target.stamina = maxf(0, target.stamina - balance.block_cost)
-			source.stamina = maxf(0, source.stamina - balance.blocked_cost)
-			source.exhaust_if_empty()
-			target.exhaust_if_empty()
 		fx_ring(target.position, 45, Color("91dfff"), 0.2)
 	var final = maxf(1, amount * (1 - reduction))
 	target.hp -= final
+	if target is CrownFighter and target.hp > 0:
+		target.add_groggy(balance.groggy_block if was_blocking else balance.groggy_hit)
 	if source is CrownFighter:
 		source.hp = minf(source.max_hp, source.hp + final * source.lifesteal)
 		add_xp(source, minf(2, final * 0.028))
@@ -241,9 +239,8 @@ func kill_target(target, killer) -> void:
 		killer.kills += 1
 		add_xp(killer, 110 + target.level * 25)
 		killer.hp = killer.max_hp
-		killer.stamina = killer.max_stamina
 		killer.combat_left = 0
-		killer.exhausted = 0
+		killer.reset_groggy()
 		float_text(killer.position, "완전 회복!", Color("7be2b0"))
 		if killer.is_player:
 			run_kills += 1
@@ -319,7 +316,7 @@ func start_boss(manual: bool = false) -> void:
 	snapshots.clear()
 	for f in fighters:
 		var values = f.snapshot_stats()
-		for key in ["position", "hp", "stamina", "alive", "invuln", "combat_left", "no_hit_time", "exhausted", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
+		for key in ["position", "hp", "groggy", "groggy_decay_left", "groggy_immunity", "alive", "invuln", "combat_left", "no_hit_time", "groggy_left", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
 		snapshots.append({"fighter": f, "values": values})
 		if not participants.has(f):
 			f.alive = false
@@ -328,9 +325,8 @@ func start_boss(manual: bool = false) -> void:
 		for key in f.base_stats:
 			if key != "body_scale": f.set(key, f.base_stats[key] + (f.get(key) - f.base_stats[key]) * 0.1)
 		f.hp = f.max_hp
-		f.stamina = f.max_stamina
 		f.combat_left = 0
-		f.exhausted = 0
+		f.reset_groggy()
 		f.invuln = 1
 		f.boss_damage = 0
 		f.boss_kills = 0
@@ -387,8 +383,7 @@ func revive() -> void:
 	player.alive = true
 	player.show()
 	player.hp = player.max_hp
-	player.stamina = player.max_stamina
-	player.exhausted = 0
+	player.reset_groggy()
 	player.invuln = 3
 	player.position = balance.world_size / 2
 	mode = "play"

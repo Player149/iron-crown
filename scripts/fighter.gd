@@ -17,8 +17,6 @@ var level: int = 1
 var xp: float = 0
 var max_hp: float = 100
 var hp: float = 100
-var max_stamina: float = 100
-var stamina: float = 100
 var armor: float = 3
 var attack_speed: float = 1
 var crit: float = 0.06
@@ -39,7 +37,10 @@ var invuln: float = 0
 var blocking: bool = false
 var combat_left: float = 0
 var no_hit_time: float = 99
-var exhausted: float = 0
+var groggy_left: float = 0
+var groggy: float = 0
+var groggy_decay_left: float = 0
+var groggy_immunity: float = 0
 var dash_left: float = 0
 var dash_velocity: Vector2 = Vector2.ZERO
 var facing: float = 0
@@ -55,12 +56,9 @@ var respawn_timer: float = 0
 func _ready() -> void:
 	max_hp = arena.balance.starting_hp
 	hp = max_hp
-	max_stamina = arena.balance.starting_stamina
-	stamina = max_stamina
 	for key in definition.multipliers: set(key, get(key) * definition.multipliers[key])
 	for key in definition.additions: set(key, get(key) + definition.additions[key])
 	hp = max_hp
-	stamina = max_stamina
 	attack_target_limit = definition.attack_target_limit
 	var library = $AnimationPlayer.get_animation_library("").duplicate()
 	$AnimationPlayer.remove_animation_library("")
@@ -75,7 +73,7 @@ func _ready() -> void:
 
 func snapshot_stats() -> Dictionary:
 	var result = {}
-	for key in ["max_hp", "max_stamina", "damage", "speed", "attack_speed", "armor", "crit", "lifesteal", "skill_power", "xp_gain", "body_scale", "dash_mult", "block_reduction", "gold_bonus"]:
+	for key in ["max_hp", "damage", "speed", "attack_speed", "armor", "crit", "lifesteal", "skill_power", "xp_gain", "body_scale", "dash_mult", "block_reduction", "gold_bonus"]:
 		result[key] = get(key)
 	return result
 
@@ -85,25 +83,23 @@ func tick(dt: float) -> void:
 	for key in cooldown:
 		cooldown[key] = maxf(0, cooldown[key] - dt)
 	invuln = maxf(0, invuln - dt)
-	exhausted = maxf(0, exhausted - dt)
+	update_groggy(dt)
 	combat_left = maxf(0, combat_left - dt)
 	no_hit_time += dt
 	blocking = false
 	velocity = Vector2.ZERO
-	if exhausted <= 0:
+	if groggy_left <= 0:
 		if is_player:
 			player_control()
 		else:
 			ai_control(dt)
-	if dash_left > 0 and exhausted <= 0:
+	if dash_left > 0 and groggy_left <= 0:
 		dash_left -= dt
 		velocity = dash_velocity
 		arena.fx_ring(position, 12, Color("79dbf4") if is_player and Meta.rune_level("frost") > 0 else tint, 0.2)
 	position += velocity * dt
 	var bounds: Rect2 = arena.bounds()
 	position = position.clamp(bounds.position + Vector2.ONE * 30, bounds.end - Vector2.ONE * 30)
-	if not blocking:
-		stamina = minf(max_stamina, stamina + arena.balance.stamina_regen * dt)
 	if no_hit_time >= arena.balance.regen_delay:
 		hp = minf(max_hp, hp + max_hp * arena.balance.health_regen * dt)
 	update_visual()
@@ -117,7 +113,7 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
-	blocking = (Input.is_action_pressed("block") or arena.touch_block) and stamina > 0
+	blocking = (Input.is_action_pressed("block") or arena.touch_block)
 	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
 	if blocking: multiplier *= 0.5
 	velocity = move * speed * multiplier
@@ -139,7 +135,7 @@ func ai_control(dt: float) -> void:
 	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
 	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
 	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	blocking = ai_block > 0 and stamina > 0
+	blocking = ai_block > 0
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
 	velocity = (offset.normalized() * toward + side) * speed * (0.5 if blocking else 1.0)
 	if distance < 92: attack()
@@ -149,17 +145,10 @@ func ai_control(dt: float) -> void:
 	if distance > 210 and distance < 440 and randf() < dt * 0.24: dash(offset.normalized())
 
 func can_act() -> bool:
-	return alive and exhausted <= 0
-
-func spend(amount: float) -> bool:
-	if combat_left <= 0: return true
-	if stamina < amount: return false
-	stamina -= amount
-	return true
+	return alive and groggy_left <= 0
 
 func attack() -> void:
 	if not can_act() or blocking or cooldown.attack > 0: return
-	if not spend(arena.balance.attack_cost): return
 	cooldown.attack = definition.attack_cooldown / attack_speed
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
@@ -176,7 +165,7 @@ func resolve_attack_hit() -> void:
 			arena.deal_damage(target, damage * (1.7 if critical else 1.0), self)
 			target.position += offset.normalized() * 5
 			count += 1
-			if exhausted > 0 or (attack_target_limit > 0 and count >= attack_target_limit): break
+			if groggy_left > 0 or (attack_target_limit > 0 and count >= attack_target_limit): break
 	arena.add_xp(self, 0.35)
 
 func dash(direction: Vector2 = Vector2.ZERO) -> void:
@@ -207,7 +196,6 @@ func equip_ability(slot: String, ability: CrownAbility) -> void:
 func skill(key: String) -> void:
 	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0: return
 	var ability: CrownAbility = abilities[key]
-	if not spend(ability.stamina_cost): return
 	cooldown[key] = ability.cooldown
 	pending_skills[key] = ability
 	ability_players[key].play("cast")
@@ -222,23 +210,45 @@ func resolve_skill_hit(key: String) -> void:
 	ability.execute(self)
 	arena.add_xp(self, ability.experience)
 
-func exhaust_if_empty() -> void:
-	if stamina > 0 or exhausted > 0: return
-	exhausted = arena.balance.exhaustion_duration
+func add_groggy(amount: float) -> void:
+	if not alive or groggy_left > 0 or groggy_immunity > 0: return
+	groggy = minf(arena.balance.groggy_threshold, groggy + maxf(0, amount))
+	groggy_decay_left = arena.balance.groggy_decay_delay
+	if groggy < arena.balance.groggy_threshold: return
+	groggy_left = arena.balance.groggy_duration
 	blocking = false
 	dash_left = 0
 	velocity = Vector2.ZERO
-	arena.float_text(position, "탈진!", Color("ffcf63"))
+	pending_skills.clear()
+	$AnimationPlayer.stop()
+	$Visual.position = Vector2.ZERO
+	$Visual/WeaponPivot.rotation = 0
+	for animator in ability_players.values(): animator.stop()
+	arena.float_text(position, "그로기!", Color("ffcf63"))
+
+func update_groggy(dt: float) -> void:
+	if groggy_left > 0:
+		groggy_left = maxf(0, groggy_left - dt)
+		if groggy_left == 0:
+			groggy = 0
+			groggy_immunity = arena.balance.groggy_recovery_immunity
+		return
+	groggy_immunity = maxf(0, groggy_immunity - dt)
+	var decay_dt = maxf(0, dt - groggy_decay_left)
+	groggy_decay_left = maxf(0, groggy_decay_left - dt)
+	groggy = maxf(0, groggy - arena.balance.groggy_decay_rate * decay_dt)
+
+func reset_groggy() -> void:
+	groggy = 0
+	groggy_left = 0
+	groggy_decay_left = 0
+	groggy_immunity = 0
 
 func grow_level() -> void:
 	level += 1
 	var hp_gain = (arena.balance.final_hp - arena.balance.starting_hp) / (arena.balance.max_level - 1)
-	var stamina_gain = (arena.balance.final_stamina - arena.balance.starting_stamina) / (arena.balance.max_level - 1)
 	max_hp += hp_gain
-	max_stamina += stamina_gain
 	base_stats.max_hp += hp_gain
-	base_stats.max_stamina += stamina_gain
-	stamina = minf(max_stamina, stamina + stamina_gain)
 	hp = minf(max_hp, hp + max_hp * arena.balance.level_heal)
 
 func attack_color() -> Color:
@@ -260,5 +270,5 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 32 * body_scale, 0, TAU, 32, tint, evolutions.size() + 1)
 	if blocking:
 		draw_arc(Vector2.ZERO, 42 * body_scale, facing - 0.8, facing + 0.8, 16, Color("88d7f7"), 4)
-	if exhausted > 0:
-		draw_arc(Vector2(0, -75), 10, 0, TAU * exhausted / 2.0, 16, Color("ffc664"), 3)
+	if groggy_left > 0:
+		draw_arc(Vector2(0, -75), 10, 0, TAU * groggy_left / arena.balance.groggy_duration, 16, Color("ffc664"), 3)

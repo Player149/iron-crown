@@ -25,7 +25,7 @@ func _ready() -> void:
 		if arena.choice_open: return
 		arena.paused = true
 		show_pause(true))
-	for pair in [["Health", Color("e76078")], ["Stamina", Color("e1b459")], ["XP", Color("58bde4")]]:
+	for pair in [["Health", Color("e76078")], ["Groggy", Color("e1b459")], ["XP", Color("58bde4")]]:
 		var fill = StyleBoxFlat.new()
 		fill.bg_color = pair[1]
 		fill.set_corner_radius_all(4)
@@ -213,10 +213,10 @@ func update_hud() -> void:
 	var p = arena.player
 	hud.get_node("Info/Name").text = "%s · Lv.%d" % [p.display_name, p.level]
 	hud.get_node("Info/Health").value = 100 * p.hp / p.max_hp
-	hud.get_node("Info/Stamina").value = 100 * p.stamina / p.max_stamina
+	hud.get_node("Info/Groggy").value = 100 * p.groggy / arena.balance.groggy_threshold
 	hud.get_node("Info/XP").value = 100 if p.level == 40 else 100 * p.xp / arena.balance.xp_needed(p.level)
-	hud.get_node("Info/Stats").text = "HP %d/%d   ST %d/%d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), floori(p.stamina), roundi(p.max_stamina), arena.run_gold, arena.run_kills, roundi(p.damage)]
-	hud.get_node("Info/Status").text = ("탈진 %.1f초" % p.exhausted) if p.exhausted > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투")
+	hud.get_node("Info/Stats").text = "HP %d/%d   그로기 %d/%d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), floori(p.groggy), roundi(arena.balance.groggy_threshold), arena.run_gold, arena.run_kills, roundi(p.damage)]
+	hud.get_node("Info/Status").text = ("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투")
 	if arena.mode == "boss" and arena.boss != null:
 		hud.get_node("Boss").text = "BOSS %s · %s\nHP %d / %d" % [arena.boss.display_name, time_text(arena.boss_timer), ceili(arena.boss.hp), roundi(arena.boss.max_hp)]
 	else: hud.get_node("Boss").text = "다음 보스 선정\n" + time_text(arena.boss_countdown)

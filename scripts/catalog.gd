@@ -10,8 +10,7 @@ const STATS = [
 	["crit", "급소 감각", "치명타 +7%p (최대 55%)"],
 	["leech", "흡혈", "흡혈 +4%p (최대 25%)"],
 	["power", "비전 증폭", "기술 위력 +14%"],
-	["dash", "짧은 발놀림", "대시 쿨타임 -14%"],
-	["stamina", "지구력 훈련", "최대 스태미나 +18"]
+	["dash", "짧은 발놀림", "대시 쿨타임 -14%"]
 ]
 const ROSTER = preload("res://data/characters/roster.tres")
 static var EVOLUTIONS: Dictionary = evolution_table()
@@ -55,9 +54,6 @@ static func apply_stat(f, id: String) -> void:
 		"leech": f.lifesteal = minf(0.25, f.lifesteal + 0.04)
 		"power": f.skill_power *= 1.14
 		"dash": f.dash_mult *= 0.86
-		"stamina":
-			f.max_stamina += 18
-			f.stamina = minf(f.max_stamina, f.stamina + 18)
 
 static func evolve(f, choice: Array) -> void:
 	var d = ROSTER.find(choice[0])

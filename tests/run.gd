@@ -27,7 +27,7 @@ func run() -> void:
 	var enemy = game.fighters[1]
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
-	near(p.max_stamina, 100, "Starting stamina")
+	check(p.get_node("AnimationPlayer").autoplay.is_empty(), "Combat animation does not autoplay on spawn")
 	var attack_target = game.fighters[1]
 	p.position = Vector2(1000, 1000)
 	attack_target.position = p.position + Vector2(80, 0)
@@ -39,61 +39,64 @@ func run() -> void:
 	near(attack_target.hp, hp_before_swing, "Attack waits for swing hit timing")
 	p.get_node("AnimationPlayer").advance(0.201)
 	await process_frame
+	check(p.position.is_equal_approx(Vector2(1000, 1000)), "Attack animation preserves world position")
 	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
 	p.hp = 20
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
 	for i in 38: p.grow_level()
 	near(p.max_hp, 400, "Level 40 base HP")
-	near(p.max_stamina, 200, "Level 40 base stamina")
-	p.stamina = 60
-	p.combat_left = 0
-	check(p.spend(15), "Out-of-combat attack permitted")
-	near(p.stamina, 60, "Out-of-combat attack free")
-	p.combat_left = 5
-	check(p.spend(15), "Combat attack permitted")
-	near(p.stamina, 45, "Combat attack costs 15")
-	check(p.spend(25), "Combat skill permitted")
-	near(p.stamina, 20, "Combat skill costs 25")
-	p.tick(1)
-	near(p.stamina, 40, "Regeneration 20 per second")
-	game.touch_block = true
-	p.tick(1)
-	near(p.stamina, 40, "Blocking prevents regeneration")
-	game.touch_block = false
-	p.blocking = true
-	p.stamina = 5
-	enemy.stamina = 15
+	p.reset_groggy()
+	p.hp = p.max_hp
 	p.invuln = 0
-	game.deal_damage(p, 10, enemy)
-	near(p.stamina, 0, "Successful block costs 5")
-	near(enemy.stamina, 0, "Blocked attacker loses 15")
-	near(p.exhausted, 2, "Defender exhausted 2 seconds")
-	near(enemy.exhausted, 2, "Attacker exhausted 2 seconds")
-	check(not p.can_act() and not enemy.can_act(), "Exhaustion disables actions")
+	p.blocking = false
+	game.deal_damage(p, 1, enemy)
+	near(p.groggy, 20, "Hit builds groggy")
+	p.blocking = true
+	game.deal_damage(p, 1, enemy)
+	near(p.groggy, 50, "Block builds more groggy without stamina")
+	p.invuln = 1
+	game.deal_damage(p, 1, enemy)
+	near(p.groggy, 50, "Invulnerable hit does not build groggy")
+	p.invuln = 0
+	p.add_groggy(50)
+	near(p.groggy_left, 2, "Threshold starts two-second groggy")
+	check(not p.can_act(), "Groggy disables actions")
+	p.add_groggy(100)
+	near(p.groggy_left, 2, "Hits cannot extend active groggy")
 	game.touch_move = Vector2.RIGHT
 	var old_position: Vector2 = p.position
 	p.tick(0.5)
-	near(p.position.distance_to(old_position), 0, "Exhaustion disables movement")
+	near(p.position.distance_to(old_position), 0, "Groggy disables movement")
 	game.touch_move = Vector2.ZERO
-	p.exhausted = 0
-	p.blocking = false
+	p.update_groggy(1.5)
+	check(p.can_act(), "Groggy recovers automatically")
+	near(p.groggy, 0, "Recovery clears meter")
+	p.add_groggy(100)
+	near(p.groggy, 0, "Recovery immunity prevents chain groggy")
+	p.update_groggy(1.1)
+	p.add_groggy(30)
+	p.update_groggy(3.0)
+	near(p.groggy, 30, "Decay waits three seconds")
+	p.update_groggy(1.0)
+	near(p.groggy, 15, "Groggy decays fifteen per second")
+	p.reset_groggy()
 	p.combat_left = 0
-	p.invuln = 0
-	game.deal_damage(p, 10, game.monsters[0])
+	p.blocking = false
+	game.deal_damage(p, 1, game.monsters[0])
 	near(p.combat_left, 0, "Monster damage does not activate knight combat")
+	near(p.groggy, 20, "Monster damage also builds groggy")
 	p.hp = 40
 	p.no_hit_time = 5
 	p.tick(1)
 	near(p.hp, 80, "Peaceful HP regeneration 10% per second")
 	p.hp = 50
-	p.stamina = 10
 	p.combat_left = 5
-	p.exhausted = 1
+	p.groggy_left = 1
 	game.kill_target(enemy, p)
 	near(p.hp, p.max_hp, "Knight kill restores HP")
-	near(p.stamina, p.max_stamina, "Knight kill restores stamina")
-	near(p.exhausted + p.combat_left, 0, "Knight kill clears exhaustion and combat")
+	near(p.groggy, 0, "Knight kill clears groggy meter")
+	near(p.groggy_left + p.combat_left, 0, "Knight kill clears groggy and combat")
 	game.start_game()
 	p = game.player
 	game.add_xp(p, 1000000)

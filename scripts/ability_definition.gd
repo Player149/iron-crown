@@ -3,7 +3,6 @@ extends Resource
 
 @export var animation: Animation
 @export var cooldown: float = 6.5
-@export var stamina_cost: float = 25.0
 @export var experience: float = 1.3
 @export_enum("area", "projectiles") var effect: String = "area"
 @export var power: float = 1.0

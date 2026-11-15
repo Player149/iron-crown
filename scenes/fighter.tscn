@@ -26,17 +26,27 @@ tracks/0/keys = {
 "update": 0,
 "values": [0.0]
 }
-tracks/1/type = "value"
+tracks/1/type = "bezier"
 tracks/1/imported = false
 tracks/1/enabled = true
-tracks/1/path = NodePath("Visual:position")
+tracks/1/path = NodePath("Visual:position:x")
 tracks/1/interp = 1
 tracks/1/loop_wrap = true
 tracks/1/keys = {
-"times": PackedFloat32Array(0),
-"transitions": PackedFloat32Array(1),
-"update": 0,
-"values": [Vector2(0, 0)]
+"handle_modes": PackedInt32Array(0),
+"points": PackedFloat32Array(0, -0.21, 0, 0.21, 0),
+"times": PackedFloat32Array(0)
+}
+tracks/2/type = "bezier"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Visual:position:y")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"handle_modes": PackedInt32Array(0),
+"points": PackedFloat32Array(0.71, -0.21, 0, 0.21, 0),
+"times": PackedFloat32Array(0)
 }
 
 [sub_resource type="Animation" id="Swing"]
@@ -64,19 +74,32 @@ tracks/1/loop_wrap = true
 tracks/1/keys = {
 "times": PackedFloat32Array(0.2),
 "transitions": PackedFloat32Array(1),
-"values": [{"args": [], "method": &"resolve_attack_hit"}]
+"values": [{
+"args": [],
+"method": &"resolve_attack_hit"
+}]
 }
-tracks/2/type = "value"
+tracks/2/type = "bezier"
 tracks/2/imported = false
 tracks/2/enabled = true
-tracks/2/path = NodePath("Visual:position")
+tracks/2/path = NodePath("Visual:position:x")
 tracks/2/interp = 1
 tracks/2/loop_wrap = true
 tracks/2/keys = {
-"times": PackedFloat32Array(0.08, 0.19, 0.42),
-"transitions": PackedFloat32Array(1, 1, 1),
-"update": 0,
-"values": [Vector2(0, 0), Vector2(35, 0), Vector2(0, 0)]
+"handle_modes": PackedInt32Array(0, 3, 3),
+"points": PackedFloat32Array(0, 0, 0, 0, 0, 17.13, -0.08000001, -0.37000084, 0.08000001, 0.37000084, 0, -0.109999985, 1.5, 0.109999985, -1.5),
+"times": PackedFloat32Array(0.07, 0.19999999, 0.42)
+}
+tracks/3/type = "bezier"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Visual:position:y")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"handle_modes": PackedInt32Array(0, 2, 2),
+"points": PackedFloat32Array(0, 0, 0, 0.03333333, 0.11833333, 0, -0.03333333, 0, 0, 0, 0, -0.03666667, 0, 0, 0),
+"times": PackedFloat32Array(0.07, 0.19999999, 0.42)
 }
 
 [sub_resource type="AnimationLibrary" id="Anims"]
@@ -90,6 +113,7 @@ default_font = ExtResource("5")
 default_font_size = 13
 
 [node name="Fighter" type="CharacterBody2D" unique_id=1975722111]
+
 collision_mask = 0
 script = ExtResource("1")
 
@@ -124,7 +148,7 @@ shape = SubResource("Attack")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=2104833756]
 libraries/ = SubResource("Anims")
-autoplay = &"swing"
+
 
 [node name="NameLabel" type="Label" parent="." unique_id=1179873608]
 offset_left = -90.0

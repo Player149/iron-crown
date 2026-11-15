@@ -5,16 +5,16 @@ extends Resource
 @export var max_level: int = 40
 @export var starting_hp: float = 100.0
 @export var final_hp: float = 400.0
-@export var starting_stamina: float = 100.0
-@export var final_stamina: float = 200.0
+@export_category("Groggy - provisional balance")
+@export var groggy_threshold: float = 100.0
+@export var groggy_hit: float = 20.0
+@export var groggy_block: float = 30.0
+@export var groggy_duration: float = 2.0
+@export var groggy_decay_delay: float = 3.0
+@export var groggy_decay_rate: float = 15.0
+@export var groggy_recovery_immunity: float = 1.0
 @export_category("Combat")
-@export var stamina_regen: float = 20.0
-@export var attack_cost: float = 15.0
-@export var skill_cost: float = 25.0
-@export var block_cost: float = 5.0
-@export var blocked_cost: float = 15.0
 @export var combat_duration: float = 5.0
-@export var exhaustion_duration: float = 2.0
 @export var regen_delay: float = 5.0
 @export var health_regen: float = 0.1
 @export var level_heal: float = 0.15

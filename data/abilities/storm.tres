@@ -1,11 +1,25 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/ability_definition.gd" id="1"]
+[gd_resource type="Resource" script_class="CrownAbility" format=3 uid="uid://c14tlb05kqfh0"]
+
+[ext_resource type="Script" uid="uid://6vnc08tju64n" path="res://scripts/ability_definition.gd" id="1"]
+
 [sub_resource type="Animation" id="Cast"]
 resource_name = "cast"
 length = 0.4
 tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
 tracks/0/path = NodePath(".")
-tracks/0/keys = {"times": PackedFloat32Array(0.2), "transitions": PackedFloat32Array(1), "values": [{"args": ["q"], "method": &"resolve_skill_hit"}]}
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.2),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": ["q"],
+"method": &"resolve_skill_hit"
+}]
+}
+
 [resource]
 script = ExtResource("1")
 animation = SubResource("Cast")
