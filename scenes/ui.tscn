@@ -72,7 +72,7 @@ custom_minimum_size = Vector2(0, 44)
 text = "룬 · 장비 보관함"
 [node name="Help" type="Label" parent="Root/Menu/Center/Box"]
 layout_mode = 2
-text = "WASD 이동 · 좌클릭 공격 · 우클릭 막기 · Shift 달리기
+text = "WASD 이동 · 좌클릭 공격 · T 스탯 투자 · Shift 달리기
 Space 대시 · E/R/Q 기술 · Esc 일시정지
 모바일: 화면 조이스틱과 전투 버튼 / 가로 화면 권장"
 theme_override_font_sizes/font_size = 14
@@ -130,6 +130,15 @@ offset_top = 58.0
 offset_bottom = 230.0
 horizontal_alignment = 2
 theme_override_font_sizes/font_size = 14
+[node name="Invest" type="Button" parent="Root/HUD"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_right = -116.0
+offset_top = 12.0
+offset_bottom = 48.0
+text = "스탯 투자"
 [node name="Pause" type="Button" parent="Root/HUD"]
 layout_mode = 1
 anchor_left = 1.0

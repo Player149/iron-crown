@@ -40,7 +40,7 @@ func _ready() -> void:
 	ui.show_menu()
 
 func setup_input() -> void:
-	var keys = {"left": KEY_A, "right": KEY_D, "up": KEY_W, "down": KEY_S, "run": KEY_SHIFT, "dash": KEY_SPACE, "e": KEY_E, "r": KEY_R, "q": KEY_Q, "pause": KEY_ESCAPE, "level_test": KEY_L, "boss_test": KEY_B}
+	var keys = {"left": KEY_A, "right": KEY_D, "up": KEY_W, "down": KEY_S, "run": KEY_SHIFT, "dash": KEY_SPACE, "e": KEY_E, "r": KEY_R, "q": KEY_Q, "pause": KEY_ESCAPE, "invest": KEY_T, "level_test": KEY_L, "boss_test": KEY_B}
 	for key in keys:
 		if not InputMap.has_action(key): InputMap.add_action(key)
 		var event = InputEventKey.new()
@@ -57,6 +57,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and mode in ["play", "boss"] and not choice_open:
 		paused = not paused
 		ui.show_pause(paused)
+	if active() and event.is_action_pressed("invest"): ui.show_stat_invest()
 	if active() and event.is_action_pressed("level_test") and mode == "play": add_xp(player, balance.xp_needed(player.level) - player.xp + 1)
 	if active() and event.is_action_pressed("boss_test"): start_boss(true)
 
@@ -98,7 +99,8 @@ func start_game(boost: bool = false) -> void:
 		Meta.boosts -= 1
 		for i in 4:
 			player.grow_level()
-			CrownCatalog.apply_stat(player, CrownCatalog.STATS.pick_random()[0])
+			CrownCatalog.spend_stat(player, CrownCatalog.FREE_STATS.pick_random()[0])
+			CrownCatalog.apply_perk(player, CrownCatalog.PERKS.pick_random()[0])
 		choices.append({"kind": "evolution", "level": 5})
 		player.hp = player.max_hp
 		Meta.save_data()
@@ -200,17 +202,16 @@ func deal_damage(target, amount: float, source) -> float:
 	if duel:
 		target.combat_left = balance.combat_duration
 		source.combat_left = balance.combat_duration
-	var was_blocking = target is CrownFighter and target.blocking and target.groggy_left <= 0
 	var reduction = target.armor / (100.0 + target.armor)
-	if target is CrownFighter and target.blocking and target.groggy_left <= 0:
-		reduction = 1 - (1 - reduction) * (1 - target.block_reduction)
-		fx_ring(target.position, 45, Color("91dfff"), 0.2)
 	var final = maxf(1, amount * (1 - reduction))
 	target.hp -= final
-	if target is CrownFighter and target.hp > 0:
-		target.add_groggy(balance.groggy_block if was_blocking else balance.groggy_hit)
 	if source is CrownFighter:
 		source.hp = minf(source.max_hp, source.hp + final * source.lifesteal)
+		# Special upgrades are independent of freely allocated base stats.
+		if int(source.perks.get("execute", 0)) > 0 and target.hp > 0 and target.hp / target.max_hp < 0.3:
+			var extra = final * 0.12 * int(source.perks["execute"])
+			target.hp -= extra
+			float_text(target.position, "+%d 처형" % roundi(extra), Color("ffad77"))
 		add_xp(source, minf(2, final * 0.028))
 		if mode == "boss" and target == boss: source.boss_damage += final
 	float_text(target.position, str(roundi(final)), Color("f6d8da"))
@@ -227,7 +228,10 @@ func kill_target(target, killer) -> void:
 	fx_ring(target.position, 70, Color("ff627f"), 0.5)
 	if not target is CrownFighter:
 		target.respawn_timer = randf_range(8, 14)
-		if killer is CrownFighter: add_xp(killer, 48 if target.brute else 28)
+		if killer is CrownFighter:
+			add_xp(killer, 48 if target.brute else 28)
+			if int(killer.perks.get("siphon", 0)) > 0:
+				killer.hp = minf(killer.max_hp, killer.hp + killer.max_hp * 0.04 * int(killer.perks["siphon"]))
 		return
 	if mode == "boss":
 		if target == boss: boss_finish_pending = true
@@ -242,6 +246,7 @@ func kill_target(target, killer) -> void:
 		killer.combat_left = 0
 		killer.reset_groggy()
 		float_text(killer.position, "완전 회복!", Color("7be2b0"))
+		# Player-versus-player kills already fully heal; siphon applies to monster kills.
 		if killer.is_player:
 			run_kills += 1
 			run_gold += roundi((70 + target.level * 20) * killer.gold_bonus)
@@ -283,16 +288,18 @@ func add_xp(f, amount: float) -> void:
 		if f.is_player:
 			run_gold += roundi((28 + f.level * 5) * f.gold_bonus)
 			if not CrownCatalog.options_for(f, f.level).is_empty(): choices.append({"kind": "evolution", "level": f.level})
-			choices.append({"kind": "stat", "level": f.level})
+			choices.append({"kind": "perk", "level": f.level})
 			sound("level", f)
 		else:
-			CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
+			CrownCatalog.spend_stat(f, CrownCatalog.FREE_STATS.pick_random()[0])
+			CrownCatalog.apply_perk(f, CrownCatalog.PERKS.pick_random()[0])
 			if not CrownCatalog.options_for(f, f.level).is_empty(): CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 	if f.is_player: process_choices()
 
 func advance_bot(f) -> void:
 	f.grow_level()
-	CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
+	CrownCatalog.spend_stat(f, CrownCatalog.FREE_STATS.pick_random()[0])
+	CrownCatalog.apply_perk(f, CrownCatalog.PERKS.pick_random()[0])
 	if not CrownCatalog.options_for(f, f.level).is_empty(): CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 
 func process_choices() -> void:

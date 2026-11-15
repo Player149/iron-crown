@@ -1,16 +1,19 @@
 class_name CrownCatalog
 extends RefCounted
 
-const STATS = [
-	["edge", "날 세우기", "공격력 +12%"],
-	["health", "생명력", "최대 체력 +15%, 증가분 회복"],
-	["speed", "가벼운 갑옷", "이동 속도 +9%"],
-	["haste", "연속 베기", "공격 속도 +13%"],
-	["armor", "강철판", "방어력 +8"],
-	["crit", "급소 감각", "치명타 +7%p (최대 55%)"],
-	["leech", "흡혈", "흡혈 +4%p (최대 25%)"],
-	["power", "비전 증폭", "기술 위력 +14%"],
-	["dash", "짧은 발놀림", "대시 쿨타임 -14%"]
+const FREE_STATS = [
+	["damage", "공격력", "공격력 +4%"],
+	["health", "체력", "최대 체력 +6%"],
+	["haste", "공격속도", "공격속도 +4% (최대 +80%)"],
+	["speed", "이동속도", "이동속도 +3% (최대 +45%)"]
+]
+const PERKS = [
+	["crit", "급소 감각", "치명타 확률 +6%p (최대 48%)"],
+	["leech", "흡혈", "가한 피해의 4% 회복 (최대 24%)"],
+	["power", "비전 증폭", "스킬 위력 +12%"],
+	["dash", "짧은 발놀림", "대시 쿨타임 -12%"],
+	["execute", "처형 본능", "체력 30% 미만 대상 추가 피해 (+12%, 최대 3중첩)"],
+	["siphon", "전투 수확", "몬스터 처치 시 최대 체력 4% 회복 (최대 3중첩)"]
 ]
 const ROSTER = preload("res://data/characters/roster.tres")
 static var EVOLUTIONS: Dictionary = evolution_table()
@@ -40,20 +43,31 @@ const RUNES = [
 	["fortune", "황금 손", "골드 +8% / 레벨"]
 ]
 
-static func apply_stat(f, id: String) -> void:
+static func spend_stat(f, id: String) -> bool:
+	if f.stat_points <= 0: return false
 	match id:
-		"edge": f.damage *= 1.12
+		"damage": f.damage *= 1.04
 		"health":
-			var gain = f.max_hp * 0.15
+			var gain = f.max_hp * 0.06
 			f.max_hp += gain
 			f.hp += gain
-		"speed": f.speed *= 1.09
-		"haste": f.attack_speed *= 1.13
-		"armor": f.armor += 8
-		"crit": f.crit = minf(0.55, f.crit + 0.07)
-		"leech": f.lifesteal = minf(0.25, f.lifesteal + 0.04)
-		"power": f.skill_power *= 1.14
-		"dash": f.dash_mult *= 0.86
+		"haste":
+			if f.attack_speed >= 1.8: return false
+			f.attack_speed = minf(1.8, f.attack_speed * 1.04)
+		"speed":
+			if f.speed >= 1.45 * f.base_stats.speed: return false
+			f.speed = minf(1.45 * f.base_stats.speed, f.speed * 1.03)
+		_: return false
+	f.stat_points -= 1
+	return true
+
+static func apply_perk(f, id: String) -> void:
+	match id:
+		"crit": f.crit = minf(0.48, f.crit + 0.06)
+		"leech": f.lifesteal = minf(0.24, f.lifesteal + 0.04)
+		"power": f.skill_power *= 1.12
+		"dash": f.dash_mult = maxf(0.45, f.dash_mult * 0.88)
+		"execute", "siphon": f.perks[id] = mini(3, int(f.perks.get(id, 0)) + 1)
 
 static func evolve(f, choice: Array) -> void:
 	var d = ROSTER.find(choice[0])
@@ -65,7 +79,6 @@ static func evolve(f, choice: Array) -> void:
 	for key in d.multipliers: f.set(key, f.get(key) * d.multipliers[key])
 	for key in d.additions: f.set(key, f.get(key) + d.additions[key])
 	f.hp = minf(f.max_hp, f.hp + maxf(0, f.max_hp - old_hp))
-	f.block_reduction = minf(0.82, f.block_reduction)
 	f.attack_target_limit = d.attack_target_limit
 	if d.attack_animation != null:
 		f.get_node("AnimationPlayer").get_animation_library("").add_animation("swing", d.attack_animation)

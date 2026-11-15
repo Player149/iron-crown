@@ -27,6 +27,7 @@ func run() -> void:
 	var enemy = game.fighters[1]
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
+	check(p.stat_points == 0, "No free points at level one")
 	check(p.get_node("AnimationPlayer").autoplay.is_empty(), "Combat animation does not autoplay on spawn")
 	var attack_target = game.fighters[1]
 	p.position = Vector2(1000, 1000)
@@ -43,6 +44,10 @@ func run() -> void:
 	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
 	p.hp = 20
 	p.grow_level()
+	check(p.stat_points == 1, "Level grants free stat point")
+	var before_invest = p.damage
+	check(CrownCatalog.spend_stat(p, "damage"), "Can spend free stat point")
+	check(p.damage > before_invest and p.stat_points == 0, "Free stat allocation changes damage")
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
 	for i in 38: p.grow_level()
 	near(p.max_hp, 400, "Level 40 base HP")
@@ -51,13 +56,13 @@ func run() -> void:
 	p.invuln = 0
 	p.blocking = false
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 20, "Hit builds groggy")
+	near(p.groggy, 0, "Normal hits do not build groggy")
 	p.blocking = true
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 50, "Block builds more groggy without stamina")
+	near(p.groggy, 0, "Blocking input no longer changes damage state")
 	p.invuln = 1
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 50, "Invulnerable hit does not build groggy")
+	near(p.groggy, 0, "Invulnerable hit does not build groggy")
 	p.invuln = 0
 	p.add_groggy(50)
 	near(p.groggy_left, 2, "Threshold starts two-second groggy")
@@ -85,7 +90,7 @@ func run() -> void:
 	p.blocking = false
 	game.deal_damage(p, 1, game.monsters[0])
 	near(p.combat_left, 0, "Monster damage does not activate knight combat")
-	near(p.groggy, 20, "Monster damage also builds groggy")
+	near(p.groggy, 0, "Monster damage no longer builds groggy")
 	p.hp = 40
 	p.no_hit_time = 5
 	p.tick(1)

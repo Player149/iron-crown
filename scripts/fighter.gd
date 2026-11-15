@@ -15,6 +15,8 @@ var attack_target_limit: int = 2
 var arena
 var level: int = 1
 var xp: float = 0
+var stat_points: int = 0
+var perks: Dictionary = {}
 var max_hp: float = 100
 var hp: float = 100
 var armor: float = 3
@@ -113,9 +115,7 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
-	blocking = (Input.is_action_pressed("block") or arena.touch_block)
 	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
-	if blocking: multiplier *= 0.5
 	velocity = move * speed * multiplier
 	if (not arena.touch_mode and Input.is_action_pressed("attack")) or arena.touch_attack: attack()
 	if Input.is_action_just_pressed("dash"): dash(move)
@@ -134,10 +134,8 @@ func ai_control(dt: float) -> void:
 	facing = offset.angle()
 	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
 	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
-	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	blocking = ai_block > 0
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
-	velocity = (offset.normalized() * toward + side) * speed * (0.5 if blocking else 1.0)
+	velocity = (offset.normalized() * toward + side) * speed
 	if distance < 92: attack()
 	if distance < 430 and randf() < dt * 0.5: skill("e")
 	if distance < 220 and randf() < dt * 0.3: skill("r")
@@ -148,13 +146,13 @@ func can_act() -> bool:
 	return alive and groggy_left <= 0
 
 func attack() -> void:
-	if not can_act() or blocking or cooldown.attack > 0: return
+	if not can_act() or cooldown.attack > 0: return
 	cooldown.attack = definition.attack_cooldown / attack_speed
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
 
 func resolve_attack_hit() -> void:
-	if not can_act() or blocking or not arena.active(): return
+	if not can_act() or not arena.active(): return
 	var reach = (attack_range_override if attack_range_override > 0 else arena.balance.attack_range) * body_scale
 	var count = 0
 	arena.fx_ring(position + Vector2.from_angle(facing) * 50, reach * 0.5, attack_color(), 0.15)
@@ -249,6 +247,10 @@ func grow_level() -> void:
 	var hp_gain = (arena.balance.final_hp - arena.balance.starting_hp) / (arena.balance.max_level - 1)
 	max_hp += hp_gain
 	base_stats.max_hp += hp_gain
+	# Automatic offense scales with level; optional points specialize the build.
+	damage += 0.35
+	base_stats.damage += 0.35
+	stat_points += 1
 	hp = minf(max_hp, hp + max_hp * arena.balance.level_heal)
 
 func attack_color() -> Color:
@@ -257,7 +259,7 @@ func attack_color() -> Color:
 func update_visual() -> void:
 	$Visual.rotation = facing
 	$Visual.scale = Vector2.ONE * body_scale
-	$Visual/Shield.modulate = Color("bfefff") if blocking else Color("6d798b")
+	$Visual/Shield.visible = false
 	$Visual/Body.modulate = Color("ffd47b") if boss_flag else tint
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
@@ -268,7 +270,5 @@ func _draw() -> void:
 	draw_circle(Vector2(0, 18), 29 * body_scale, Color(0, 0, 0, 0.25))
 	if evolutions.size() > 0:
 		draw_arc(Vector2.ZERO, 32 * body_scale, 0, TAU, 32, tint, evolutions.size() + 1)
-	if blocking:
-		draw_arc(Vector2.ZERO, 42 * body_scale, facing - 0.8, facing + 0.8, 16, Color("88d7f7"), 4)
 	if groggy_left > 0:
 		draw_arc(Vector2(0, -75), 10, 0, TAU * groggy_left / arena.balance.groggy_duration, 16, Color("ffc664"), 3)
