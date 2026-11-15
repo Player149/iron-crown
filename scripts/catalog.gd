@@ -13,7 +13,7 @@ const PERKS = [
 	["power", "비전 증폭", "스킬 위력 +12%"],
 	["dash", "짧은 발놀림", "대시 쿨타임 -12%"],
 	["execute", "처형 본능", "체력 30% 미만 대상 추가 피해 (+12%, 최대 3중첩)"],
-	["siphon", "전투 수확", "기사 처치 시 최대 체력 4% 추가 회복 (최대 3중첩)"]
+	["siphon", "전투 수확", "몬스터 처치 시 최대 체력 4% 회복 (최대 3중첩)"]
 ]
 const ROSTER = preload("res://data/characters/roster.tres")
 static var EVOLUTIONS: Dictionary = evolution_table()
@@ -51,8 +51,12 @@ static func spend_stat(f, id: String) -> bool:
 			var gain = f.max_hp * 0.06
 			f.max_hp += gain
 			f.hp += gain
-		"haste": f.attack_speed = minf(1.8, f.attack_speed * 1.04)
-		"speed": f.speed = minf(1.45 * f.base_stats.speed, f.speed * 1.03)
+		"haste":
+			if f.attack_speed >= 1.8: return false
+			f.attack_speed = minf(1.8, f.attack_speed * 1.04)
+		"speed":
+			if f.speed >= 1.45 * f.base_stats.speed: return false
+			f.speed = minf(1.45 * f.base_stats.speed, f.speed * 1.03)
 		_: return false
 	f.stat_points -= 1
 	return true
