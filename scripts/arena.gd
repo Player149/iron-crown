@@ -200,15 +200,23 @@ func deal_damage(target, amount: float, source) -> float:
 	if duel:
 		target.combat_left = balance.combat_duration
 		source.combat_left = balance.combat_duration
+	var perfect_guard = target is CrownFighter and target.is_perfect_guard()
 	var was_blocking = target is CrownFighter and target.absorb_guard_hit() and target.groggy_left <= 0
 	var reduction = target.armor / (100.0 + target.armor)
 	if was_blocking:
 		reduction = 1 - (1 - reduction) * (1 - target.block_reduction)
 		fx_ring(target.position, 45, Color("91dfff"), 0.2)
+		if source is CrownFighter:
+			# An attack already costs stamina at startup: blocking adds a separate penalty.
+			source.stamina = maxf(0.0, source.stamina - balance.attack_stamina_cost * balance.blocked_attack_stamina_multiplier)
+			if perfect_guard:
+				source.add_groggy(balance.perfect_guard_groggy)
+				float_text(target.position, "완벽 방어!", Color("f2d47c"))
+				fx_ring(target.position, 62, Color("ffd877"), 0.25)
 	var final = maxf(1, amount * (1 - reduction))
 	target.hp -= final
-	if target is CrownFighter and target.hp > 0:
-		target.add_groggy(balance.groggy_block if was_blocking else balance.groggy_hit)
+	if target is CrownFighter and target.hp > 0 and not was_blocking:
+		target.add_groggy(balance.groggy_hit)
 	if source is CrownFighter:
 		source.hp = minf(source.max_hp, source.hp + final * source.lifesteal)
 		add_xp(source, minf(2, final * 0.028))
@@ -317,7 +325,7 @@ func start_boss(manual: bool = false) -> void:
 	snapshots.clear()
 	for f in fighters:
 		var values = f.snapshot_stats()
-		for key in ["position", "hp", "stamina", "guard_phase", "guard_time", "attack_lock", "groggy", "groggy_decay_left", "groggy_immunity", "alive", "invuln", "combat_left", "no_hit_time", "groggy_left", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
+		for key in ["position", "hp", "stamina", "guard_phase", "guard_time", "perfect_guard_left", "attack_lock", "groggy", "groggy_decay_left", "groggy_immunity", "alive", "invuln", "combat_left", "no_hit_time", "groggy_left", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
 		snapshots.append({"fighter": f, "values": values})
 		if not participants.has(f):
 			f.alive = false
