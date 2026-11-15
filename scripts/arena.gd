@@ -210,6 +210,7 @@ func deal_damage(target, amount: float, source) -> float:
 			# An attack already costs stamina at startup: blocking adds a separate penalty.
 			source.stamina = maxf(0.0, source.stamina - balance.attack_stamina_cost * balance.blocked_attack_stamina_multiplier)
 			if perfect_guard:
+				target.perfect_guard_left = 0.0
 				source.add_groggy(balance.perfect_guard_groggy)
 				float_text(target.position, "완벽 방어!", Color("f2d47c"))
 				fx_ring(target.position, 62, Color("ffd877"), 0.25)
