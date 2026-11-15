@@ -58,41 +58,44 @@ func run() -> void:
 	p.guard_requested = true
 	var stamina_before_guard_raise = p.stamina
 	p.advance_guard(0.0)
+	var guard_player: AnimationPlayer = p.get_node("AnimationPlayer")
 	near(p.stamina, stamina_before_guard_raise, "Guard raise has no stamina cost")
-	check(not p.blocking and p.guard_phase == "raise", "Guard windup is vulnerable")
+	check(not p.blocking and p.guard_phase == "raise", "Guard stays vulnerable during windup")
+	# A method key in the animation, not advance_guard(), activates blocking.
 	p.advance_guard(0.15)
-	check(p.blocking and p.guard_phase == "hold", "Guard only blocks after startup")
+	check(not p.blocking, "Guard state is not driven by timer")
+	guard_player.advance(0.15)
+	await process_frame
+	check(p.blocking and p.guard_phase == "hold", "Raise animation event activates guard")
+	near(p.perfect_guard_left, game.balance.perfect_guard_window, "Guard starts perfect-block window")
 	p.guard_requested = false
-	p.advance_guard(0.01)
-	check(not p.blocking and p.guard_phase == "lower", "Guard recovery cannot block")
-	p.attack_lock = 0
-	p.cooldown.attack = 0
-	var recovery_stamina = p.stamina
-	p.attack()
-	near(p.stamina, recovery_stamina, "Cannot attack during guard recovery")
-	p.advance_guard(0.23)
-	check(p.guard_phase == "idle", "Guard recovery ends")
+	p.advance_guard(0.0)
+	check(not p.blocking and p.guard_phase == "lower", "Guard lowering loses protection")
+	guard_player.advance(0.23)
+	await process_frame
+	check(p.guard_phase == "idle", "Lower animation event restores idle state")
 	var default_windup = game.balance.guard_windup
 	var default_recovery = game.balance.guard_recovery
 	game.balance.guard_windup = 0.30
 	game.balance.guard_recovery = 0.40
 	p.guard_requested = true
 	p.advance_guard(0.0)
-	var guard_player: AnimationPlayer = p.get_node("AnimationPlayer")
 	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_raise").length / 0.30, "Custom windup scales animation speed")
-	p.advance_guard(0.29)
-	check(not p.blocking, "Custom windup delays blocking")
-	p.advance_guard(0.02)
-	check(p.blocking, "Custom windup enables blocking at configured time")
-	check(p.get_node("Visual/Shield").position.is_equal_approx(Vector2(35, 0)), "Hold keeps authored raised pose")
+	guard_player.advance(0.29)
+	await process_frame
+	check(not p.blocking, "Custom windup keeps guard vulnerable")
+	guard_player.advance(0.02)
+	await process_frame
+	check(p.blocking, "Custom windup animation event enables guard")
 	p.guard_requested = false
 	p.advance_guard(0.0)
 	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_lower").length / 0.40, "Custom recovery scales animation speed")
-	p.advance_guard(0.39)
+	guard_player.advance(0.39)
+	await process_frame
 	check(p.guard_phase == "lower", "Custom recovery keeps action lock")
-	p.advance_guard(0.02)
-	check(p.guard_phase == "idle", "Custom recovery releases action lock")
-	check(p.get_node("Visual/Shield").position.is_equal_approx(Vector2(12, 25)), "Recovery keeps authored lowered pose")
+	guard_player.advance(0.02)
+	await process_frame
+	check(p.guard_phase == "idle", "Custom recovery ends via animation event")
 	game.balance.guard_windup = default_windup
 	game.balance.guard_recovery = default_recovery
 	p.hp = 20
@@ -104,25 +107,41 @@ func run() -> void:
 	p.hp = p.max_hp
 	p.invuln = 0
 	p.blocking = false
+	enemy.reset_groggy()
+	enemy.stamina = enemy.max_stamina
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 20, "Hit builds groggy")
-	p.blocking = true
+	near(p.groggy, 6, "Normal hit adds six groggy")
+	p.update_groggy(0.5)
+	near(p.groggy, 5, "Groggy decays continuously without delay")
 	p.guard_phase = "hold"
-	var stamina_before_guard_hit = p.stamina
+	p.blocking = true
+	p.perfect_guard_left = 0
+	var defender_groggy_before = p.groggy
+	var attacker_stamina_before = enemy.stamina
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 50, "Active guard builds more groggy")
-	check(p.stamina < stamina_before_guard_hit, "Successful guard spends stamina")
+	near(p.groggy, defender_groggy_before, "Regular guard does not gain groggy")
+	near(enemy.stamina, attacker_stamina_before - 15, "Blocked attack costs attacker 1.5x attack stamina extra")
+	p.perfect_guard_left = 0.10
+	game.deal_damage(p, 1, enemy)
+	near(enemy.groggy, 60, "Perfect guard adds 60 groggy to attacker")
+	near(p.perfect_guard_left, 0, "Perfect guard can trigger once per raise")
+	game.deal_damage(p, 1, enemy)
+	near(enemy.groggy, 60, "Repeated hit in same hold does not duplicate parry")
 	p.guard_phase = "idle"
 	p.blocking = false
 	p.invuln = 1
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 50, "Invulnerable hit does not build groggy")
+	near(p.groggy, defender_groggy_before, "Invulnerable hit adds no groggy")
 	p.invuln = 0
-	p.add_groggy(50)
-	near(p.groggy_left, 4.0 / 3.0, "Threshold starts shortened groggy")
+	p.reset_groggy()
+	# Approximately twenty normal hits at half-second intervals should cause groggy.
+	for i in 20:
+		p.add_groggy(game.balance.groggy_hit)
+		if i < 19: p.update_groggy(0.5)
+	near(p.groggy_left, 2, "About twenty sustained hits trigger two-second groggy")
 	check(not p.can_act(), "Groggy disables actions")
 	p.add_groggy(100)
-	near(p.groggy_left, 4.0 / 3.0, "Hits cannot extend active groggy")
+	near(p.groggy_left, 2, "Hits cannot extend active groggy")
 	game.touch_move = Vector2.RIGHT
 	var old_position: Vector2 = p.position
 	p.tick(0.5)
@@ -136,15 +155,15 @@ func run() -> void:
 	p.update_groggy(1.1)
 	p.add_groggy(30)
 	p.update_groggy(3.0)
-	near(p.groggy, 30, "Decay waits three seconds")
+	near(p.groggy, 24, "Groggy decays throughout combat")
 	p.update_groggy(1.0)
-	near(p.groggy, 15, "Groggy decays fifteen per second")
+	near(p.groggy, 22, "Groggy always decays two per second")
 	p.reset_groggy()
 	p.combat_left = 0
 	p.blocking = false
 	game.deal_damage(p, 1, game.monsters[0])
 	near(p.combat_left, 0, "Monster damage does not activate knight combat")
-	near(p.groggy, 20, "Monster damage also builds groggy")
+	near(p.groggy, 6, "Monster hit uses normal groggy gain")
 	p.hp = 40
 	p.no_hit_time = 5
 	p.tick(1)
