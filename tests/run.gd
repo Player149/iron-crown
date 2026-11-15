@@ -64,6 +64,7 @@ func run() -> void:
 	p.advance_guard(0.01)
 	check(not p.blocking and p.guard_phase == "lower", "Guard recovery cannot block")
 	p.attack_lock = 0
+	p.cooldown.attack = 0
 	var recovery_stamina = p.stamina
 	p.attack()
 	near(p.stamina, recovery_stamina, "Cannot attack during guard recovery")
@@ -81,8 +82,13 @@ func run() -> void:
 	game.deal_damage(p, 1, enemy)
 	near(p.groggy, 20, "Hit builds groggy")
 	p.blocking = true
+	p.guard_phase = "hold"
+	var stamina_before_guard_hit = p.stamina
 	game.deal_damage(p, 1, enemy)
-	near(p.groggy, 50, "Block builds more groggy without stamina")
+	near(p.groggy, 50, "Active guard builds more groggy")
+	check(p.stamina < stamina_before_guard_hit, "Successful guard spends stamina")
+	p.guard_phase = "idle"
+	p.blocking = false
 	p.invuln = 1
 	game.deal_damage(p, 1, enemy)
 	near(p.groggy, 50, "Invulnerable hit does not build groggy")
