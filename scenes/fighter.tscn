@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://bby3uw6vl8tuo"]
 
 [ext_resource type="Script" uid="uid://dch4ekjwaqedh" path="res://scripts/fighter.gd" id="1"]
-[ext_resource type="Texture2D" path="res://assets/Character_Base.png" id="2"]
-[ext_resource type="Texture2D" path="res://assets/Stick.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://28ucl1topisu" path="res://assets/Character_Base.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://cwdh8tj6jbc8x" path="res://assets/Stick.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://cn8uhetxh0fep" path="res://assets/shield.svg" id="4"]
 [ext_resource type="FontFile" uid="uid://c8ung84ge5tsm" path="res://assets/NotoSansKR.ttf" id="5"]
 
@@ -17,7 +17,7 @@ length = 0.001
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
-tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
+tracks/0/path = NodePath("Visual/WeaponPivot1:rotation")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
 tracks/0/keys = {
@@ -26,110 +26,17 @@ tracks/0/keys = {
 "update": 0,
 "values": [0.0]
 }
-tracks/1/type = "bezier"
+tracks/1/type = "value"
 tracks/1/imported = false
 tracks/1/enabled = true
-tracks/1/path = NodePath("Visual:position:x")
+tracks/1/path = NodePath("Visual/WeaponPivot1/WeaponPivot2:rotation")
 tracks/1/interp = 1
 tracks/1/loop_wrap = true
 tracks/1/keys = {
-"handle_modes": PackedInt32Array(0),
-"points": PackedFloat32Array(0, -0.21, 0, 0.21, 0),
-"times": PackedFloat32Array(0)
-}
-tracks/2/type = "bezier"
-tracks/2/imported = false
-tracks/2/enabled = true
-tracks/2/path = NodePath("Visual:position:y")
-tracks/2/interp = 1
-tracks/2/loop_wrap = true
-tracks/2/keys = {
-"handle_modes": PackedInt32Array(0),
-"points": PackedFloat32Array(0.71, -0.21, 0, 0.21, 0),
-"times": PackedFloat32Array(0)
-}
-
-[sub_resource type="Animation" id="Swing"]
-resource_name = "swing"
-length = 0.42
-step = 0.01
-tracks/0/type = "value"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.08, 0.2, 0.42),
-"transitions": PackedFloat32Array(1, 1, 1, 1),
-"update": 0,
-"values": [-1.1, -0.8, 0.9, 0.0]
-}
-tracks/1/type = "method"
-tracks/1/imported = false
-tracks/1/enabled = true
-tracks/1/path = NodePath(".")
-tracks/1/interp = 1
-tracks/1/loop_wrap = true
-tracks/1/keys = {
-"times": PackedFloat32Array(0.2),
+"times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
-"values": [{
-"args": [],
-"method": &"resolve_attack_hit"
-}]
-}
-tracks/2/type = "bezier"
-tracks/2/imported = false
-tracks/2/enabled = true
-tracks/2/path = NodePath("Visual:position:x")
-tracks/2/interp = 1
-tracks/2/loop_wrap = true
-tracks/2/keys = {
-"handle_modes": PackedInt32Array(0, 3, 3),
-"points": PackedFloat32Array(0, 0, 0, 0, 0, 17.13, -0.08000001, -0.37000084, 0.08000001, 0.37000084, 0, -0.109999985, 1.5, 0.109999985, -1.5),
-"times": PackedFloat32Array(0.07, 0.19999999, 0.42)
-}
-tracks/3/type = "bezier"
-tracks/3/imported = false
-tracks/3/enabled = true
-tracks/3/path = NodePath("Visual:position:y")
-tracks/3/interp = 1
-tracks/3/loop_wrap = true
-tracks/3/keys = {
-"handle_modes": PackedInt32Array(0, 2, 2),
-"points": PackedFloat32Array(0, 0, 0, 0.03333333, 0.11833333, 0, -0.03333333, 0, 0, 0, 0, -0.03666667, 0, 0, 0),
-"times": PackedFloat32Array(0.07, 0.19999999, 0.42)
-}
-
-[sub_resource type="Animation" id="GuardRaise"]
-resource_name = "guard_raise"
-length = 0.14
-tracks/0/type = "value"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath("Visual/Shield:position")
-tracks/0/interp = 1
-tracks/0/loop_wrap = false
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.14),
-"transitions": PackedFloat32Array(1, 1),
 "update": 0,
-"values": [Vector2(12, 25), Vector2(35, 0)]
-}
-tracks/1/type = "method"
-tracks/1/imported = false
-tracks/1/enabled = true
-tracks/1/path = NodePath(".")
-tracks/1/interp = 1
-tracks/1/loop_wrap = false
-tracks/1/keys = {
-"times": PackedFloat32Array(0.139),
-"transitions": PackedFloat32Array(1),
-"values": [{
-"args": [],
-"method": &"on_guard_raised"
-}]
+"values": [0.0]
 }
 
 [sub_resource type="Animation" id="GuardLower"]
@@ -162,12 +69,86 @@ tracks/1/keys = {
 }]
 }
 
+[sub_resource type="Animation" id="GuardRaise"]
+resource_name = "guard_raise"
+length = 0.14
+step = 0.016666668
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/Shield:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = false
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.14),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(12, 25), Vector2(35, 0)]
+}
+tracks/1/type = "method"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".")
+tracks/1/interp = 1
+tracks/1/loop_wrap = false
+tracks/1/keys = {
+"times": PackedFloat32Array(0.139),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"on_guard_raised"
+}]
+}
+
+[sub_resource type="Animation" id="Swing"]
+resource_name = "swing"
+length = 0.42
+step = 0.01
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/WeaponPivot1:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.12, 0.2, 0.31, 0.42),
+"transitions": PackedFloat32Array(1, 1, 0.22531253, 1, 3.2490067),
+"update": 0,
+"values": [0.0, -0.3298672286269279, 2.645919146023404, 2.8658306317746898, 0.0]
+}
+tracks/1/type = "method"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0.2),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"resolve_attack_hit"
+}]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Visual/WeaponPivot1/WeaponPivot2:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.28, 0.42),
+"transitions": PackedFloat32Array(1, 0.42044818, 1, 0.12499998),
+"update": 0,
+"values": [0.0, -0.6981317007977318, 0.7347836150896131, 0.0]
+}
+
 [sub_resource type="AnimationLibrary" id="Anims"]
 _data = {
 &"RESET": SubResource("Reset"),
-&"swing": SubResource("Swing"),
+&"guard_lower": SubResource("GuardLower"),
 &"guard_raise": SubResource("GuardRaise"),
-&"guard_lower": SubResource("GuardLower")
+&"swing": SubResource("Swing")
 }
 
 [sub_resource type="Theme" id="KnightTheme"]
@@ -175,7 +156,6 @@ default_font = ExtResource("5")
 default_font_size = 13
 
 [node name="Fighter" type="CharacterBody2D" unique_id=1975722111]
-
 collision_mask = 0
 script = ExtResource("1")
 
@@ -194,13 +174,13 @@ position = Vector2(12, 25)
 scale = Vector2(0.65, 0.65)
 texture = ExtResource("4")
 
-[node name="WeaponPivot" type="Node2D" parent="Visual" unique_id=583824191]
-position = Vector2(21, -4)
+[node name="WeaponPivot1" type="Node2D" parent="Visual" unique_id=583824191]
 
-[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot" unique_id=1827909850]
-position = Vector2(15, -8)
-rotation = -1.5707964
-scale = Vector2(1.0, 1.0)
+[node name="WeaponPivot2" type="Node2D" parent="Visual/WeaponPivot1" unique_id=1827778914]
+position = Vector2(-37, 8)
+
+[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot1/WeaponPivot2" unique_id=962260256]
+position = Vector2(-15.000004, -20)
 texture = ExtResource("3")
 
 [node name="AttackArea" type="Area2D" parent="." unique_id=1810657679]
@@ -213,7 +193,6 @@ shape = SubResource("Attack")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=2104833756]
 libraries/ = SubResource("Anims")
-
 
 [node name="NameLabel" type="Label" parent="." unique_id=1179873608]
 offset_left = -90.0
