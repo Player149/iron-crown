@@ -217,7 +217,7 @@ func update_hud() -> void:
 	hud.get_node("Info/Groggy").value = 100 * p.groggy / arena.balance.groggy_threshold
 	hud.get_node("Info/XP").value = 100 if p.level == 40 else 100 * p.xp / arena.balance.xp_needed(p.level)
 	hud.get_node("Info/Stats").text = "HP %d/%d · 기력 %d/%d · 그로기 %d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), arena.run_gold, arena.run_kills, roundi(p.damage)]
-	hud.get_node("Info/Status").text = ("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투")
+	hud.get_node("Info/Status").text = ("탈진 %.1f초" % p.exhaustion_left) if p.exhaustion_left > 0 else (("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투"))
 	if arena.mode == "boss" and arena.boss != null:
 		hud.get_node("Boss").text = "BOSS %s · %s\nHP %d / %d" % [arena.boss.display_name, time_text(arena.boss_timer), ceili(arena.boss.hp), roundi(arena.boss.max_hp)]
 	else: hud.get_node("Boss").text = "다음 보스 선정\n" + time_text(arena.boss_countdown)
