@@ -13,6 +13,16 @@ extends Resource
 @export var groggy_decay_delay: float = 3.0
 @export var groggy_decay_rate: float = 15.0
 @export var groggy_recovery_immunity: float = 1.0
+@export_category("Stamina - timed combat")
+@export var stamina_max: float = 100.0
+@export var stamina_regen: float = 24.0
+@export var attack_stamina_cost: float = 10.0
+@export var dash_stamina_cost: float = 22.0
+@export var guard_start_cost: float = 8.0
+@export var guard_drain_per_second: float = 13.0
+@export var guard_hit_cost: float = 12.0
+@export var guard_windup: float = 0.14
+@export var guard_recovery: float = 0.22
 @export_category("Combat")
 @export var combat_duration: float = 5.0
 @export var regen_delay: float = 5.0
