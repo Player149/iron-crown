@@ -96,6 +96,10 @@ text = "기사 · Lv.1"
 layout_mode = 2
 custom_minimum_size = Vector2(0, 22)
 show_percentage = false
+[node name="Stamina" type="ProgressBar" parent="Root/HUD/Info"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 14)
+show_percentage = false
 [node name="Groggy" type="ProgressBar" parent="Root/HUD/Info"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 18)
