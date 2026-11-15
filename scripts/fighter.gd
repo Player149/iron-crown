@@ -35,6 +35,12 @@ var boss_damage: float = 0
 var boss_kills: int = 0
 var invuln: float = 0
 var blocking: bool = false
+var stamina: float = 100.0
+var max_stamina: float = 100.0
+var guard_requested: bool = false
+var guard_phase: String = "idle" # idle, raise, hold, lower
+var guard_time: float = 0.0
+var attack_lock: float = 0.0
 var combat_left: float = 0
 var no_hit_time: float = 99
 var groggy_left: float = 0
@@ -59,6 +65,8 @@ func _ready() -> void:
 	for key in definition.multipliers: set(key, get(key) * definition.multipliers[key])
 	for key in definition.additions: set(key, get(key) + definition.additions[key])
 	hp = max_hp
+	max_stamina = arena.balance.stamina_max
+	stamina = max_stamina
 	attack_target_limit = definition.attack_target_limit
 	var library = $AnimationPlayer.get_animation_library("").duplicate()
 	$AnimationPlayer.remove_animation_library("")
@@ -83,16 +91,20 @@ func tick(dt: float) -> void:
 	for key in cooldown:
 		cooldown[key] = maxf(0, cooldown[key] - dt)
 	invuln = maxf(0, invuln - dt)
+	attack_lock = maxf(0, attack_lock - dt)
 	update_groggy(dt)
 	combat_left = maxf(0, combat_left - dt)
 	no_hit_time += dt
-	blocking = false
+	guard_requested = false
 	velocity = Vector2.ZERO
 	if groggy_left <= 0:
 		if is_player:
 			player_control()
 		else:
 			ai_control(dt)
+	advance_guard(dt)
+	if guard_phase == "idle" and attack_lock <= 0:
+		stamina = minf(max_stamina, stamina + arena.balance.stamina_regen * dt)
 	if dash_left > 0 and groggy_left <= 0:
 		dash_left -= dt
 		velocity = dash_velocity
@@ -113,9 +125,10 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
-	blocking = (Input.is_action_pressed("block") or arena.touch_block)
+	guard_requested = (Input.is_action_pressed("block") or arena.touch_block)
 	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
-	if blocking: multiplier *= 0.5
+	if guard_phase != "idle" or guard_requested: multiplier *= 0.5
+	elif attack_lock > 0: multiplier *= 0.75
 	velocity = move * speed * multiplier
 	if (not arena.touch_mode and Input.is_action_pressed("attack")) or arena.touch_attack: attack()
 	if Input.is_action_just_pressed("dash"): dash(move)
@@ -135,9 +148,9 @@ func ai_control(dt: float) -> void:
 	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
 	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
 	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	blocking = ai_block > 0
+	guard_requested = ai_block > 0
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
-	velocity = (offset.normalized() * toward + side) * speed * (0.5 if blocking else 1.0)
+	velocity = (offset.normalized() * toward + side) * speed * (0.5 if guard_phase != "idle" or guard_requested else 1.0)
 	if distance < 92: attack()
 	if distance < 430 and randf() < dt * 0.5: skill("e")
 	if distance < 220 and randf() < dt * 0.3: skill("r")
@@ -147,9 +160,62 @@ func ai_control(dt: float) -> void:
 func can_act() -> bool:
 	return alive and groggy_left <= 0
 
+func spend_stamina(cost: float) -> bool:
+	if stamina < cost: return false
+	stamina -= cost
+	return true
+
+func advance_guard(dt: float) -> void:
+	if not can_act(): guard_requested = false
+	if guard_phase == "idle" and guard_requested and attack_lock <= 0 and dash_left <= 0:
+		if spend_stamina(arena.balance.guard_start_cost):
+			guard_phase = "raise"
+			guard_time = arena.balance.guard_windup
+			$AnimationPlayer.play("guard_raise")
+	elif guard_phase == "raise":
+		guard_time -= dt
+		if guard_time <= 0:
+			guard_phase = "hold"
+			blocking = true
+			if not guard_requested: lower_guard()
+	elif guard_phase == "hold":
+		stamina = maxf(0, stamina - arena.balance.guard_drain_per_second * dt)
+		if not guard_requested or stamina <= 0: lower_guard()
+	elif guard_phase == "lower":
+		guard_time -= dt
+		if guard_time <= 0:
+			guard_phase = "idle"
+			$Visual/Shield.position = Vector2(12, 25)
+
+func lower_guard() -> void:
+	if guard_phase != "hold" and guard_phase != "raise": return
+	guard_phase = "lower"
+	guard_time = arena.balance.guard_recovery
+	blocking = false
+	$AnimationPlayer.play("guard_lower")
+
+func reset_guard() -> void:
+	guard_phase = "idle"
+	guard_time = 0
+	guard_requested = false
+	blocking = false
+	attack_lock = 0
+	$AnimationPlayer.stop()
+	$Visual/Shield.position = Vector2(12, 25)
+
+func absorb_guard_hit() -> bool:
+	if not blocking or guard_phase != "hold": return false
+	if not spend_stamina(arena.balance.guard_hit_cost):
+		lower_guard()
+		return false
+	return true
+
 func attack() -> void:
-	if not can_act() or blocking or cooldown.attack > 0: return
-	cooldown.attack = definition.attack_cooldown / attack_speed
+	if not can_act() or blocking or guard_requested or guard_phase != "idle" or attack_lock > 0 or cooldown.attack > 0: return
+	if not spend_stamina(arena.balance.attack_stamina_cost): return
+	var swing: Animation = $AnimationPlayer.get_animation("swing")
+	attack_lock = swing.length / attack_speed
+	cooldown.attack = maxf(definition.attack_cooldown / attack_speed, attack_lock)
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
 
@@ -169,7 +235,8 @@ func resolve_attack_hit() -> void:
 	arena.add_xp(self, 0.35)
 
 func dash(direction: Vector2 = Vector2.ZERO) -> void:
-	if not can_act() or cooldown.dash > 0: return
+	if not can_act() or cooldown.dash > 0 or attack_lock > 0 or guard_phase != "idle" or guard_requested: return
+	if not spend_stamina(arena.balance.dash_stamina_cost): return
 	if direction.length() < 0.1: direction = Vector2.from_angle(facing)
 	dash_left = 0.17
 	dash_velocity = direction.normalized() * 690
@@ -194,7 +261,7 @@ func equip_ability(slot: String, ability: CrownAbility) -> void:
 	animator.add_animation_library("", library)
 
 func skill(key: String) -> void:
-	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0: return
+	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0 or attack_lock > 0 or guard_phase != "idle" or guard_requested: return
 	var ability: CrownAbility = abilities[key]
 	cooldown[key] = ability.cooldown
 	pending_skills[key] = ability
@@ -216,7 +283,7 @@ func add_groggy(amount: float) -> void:
 	groggy_decay_left = arena.balance.groggy_decay_delay
 	if groggy < arena.balance.groggy_threshold: return
 	groggy_left = arena.balance.groggy_duration
-	blocking = false
+	reset_guard()
 	dash_left = 0
 	velocity = Vector2.ZERO
 	pending_skills.clear()
@@ -257,7 +324,7 @@ func attack_color() -> Color:
 func update_visual() -> void:
 	$Visual.rotation = facing
 	$Visual.scale = Vector2.ONE * body_scale
-	$Visual/Shield.modulate = Color("bfefff") if blocking else Color("6d798b")
+	$Visual/Shield.modulate = Color("bfefff") if blocking else (Color("aebccc") if guard_phase == "raise" else Color("6d798b"))
 	$Visual/Body.modulate = Color("ffd47b") if boss_flag else tint
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
