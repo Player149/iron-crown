@@ -182,7 +182,9 @@ func trigger_exhaustion() -> void:
 func spend_stamina(cost: float) -> bool:
 	if not can_act() or stamina < cost: return false
 	stamina = maxf(0.0, stamina - cost)
-	if stamina <= 0.0: trigger_exhaustion()
+	if stamina <= 0.0:
+		trigger_exhaustion()
+		return false
 	return true
 
 func advance_guard(dt: float) -> void:
