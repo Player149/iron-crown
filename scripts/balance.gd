@@ -21,8 +21,9 @@ extends Resource
 @export var guard_start_cost: float = 0.0
 @export var guard_drain_per_second: float = 13.0
 @export var guard_hit_cost: float = 12.0
-@export var guard_windup: float = 0.14
-@export var guard_recovery: float = 0.22
+@export_category("Guard timing - seconds, animation scales to match")
+@export_range(0.01, 2.0, 0.01, "or_greater") var guard_windup: float = 0.10
+@export_range(0.01, 2.0, 0.01, "or_greater") var guard_recovery: float = 0.16
 @export_category("Combat")
 @export var combat_duration: float = 5.0
 @export var regen_delay: float = 5.0

@@ -169,11 +169,11 @@ func advance_guard(dt: float) -> void:
 	if not can_act(): guard_requested = false
 	if guard_phase == "idle" and guard_requested and attack_lock <= 0 and dash_left <= 0:
 		guard_phase = "raise"
-		guard_time = arena.balance.guard_windup
-		$AnimationPlayer.play("guard_raise")
+		play_guard_animation("guard_raise", arena.balance.guard_windup)
 	elif guard_phase == "raise":
 		guard_time -= dt
 		if guard_time <= 0:
+			finish_guard_animation("guard_raise")
 			guard_phase = "hold"
 			blocking = true
 			if not guard_requested: lower_guard()
@@ -184,14 +184,27 @@ func advance_guard(dt: float) -> void:
 		guard_time -= dt
 		if guard_time <= 0:
 			guard_phase = "idle"
-			$Visual/Shield.position = Vector2(12, 25)
+			finish_guard_animation("guard_lower")
+
+func play_guard_animation(animation_name: String, duration: float) -> void:
+	# One duration controls both the combat lock and the editable visual timeline.
+	guard_time = maxf(0.01, duration)
+	var animation: Animation = $AnimationPlayer.get_animation(animation_name)
+	$AnimationPlayer.play(animation_name, 0.0, animation.length / guard_time)
+	$AnimationPlayer.advance(0.0)
+
+func finish_guard_animation(animation_name: String) -> void:
+	# Commit the authored end pose even when a large tick finishes the phase.
+	var animation: Animation = $AnimationPlayer.get_animation(animation_name)
+	$AnimationPlayer.play(animation_name, 0.0)
+	$AnimationPlayer.seek(animation.length, true)
+	$AnimationPlayer.pause()
 
 func lower_guard() -> void:
 	if guard_phase != "hold" and guard_phase != "raise": return
 	guard_phase = "lower"
-	guard_time = arena.balance.guard_recovery
 	blocking = false
-	$AnimationPlayer.play("guard_lower")
+	play_guard_animation("guard_lower", arena.balance.guard_recovery)
 
 func reset_guard() -> void:
 	guard_phase = "idle"
@@ -200,7 +213,7 @@ func reset_guard() -> void:
 	blocking = false
 	attack_lock = 0
 	$AnimationPlayer.stop()
-	$Visual/Shield.position = Vector2(12, 25)
+	finish_guard_animation("guard_lower")
 
 func absorb_guard_hit() -> bool:
 	if not blocking or guard_phase != "hold": return false

@@ -72,6 +72,29 @@ func run() -> void:
 	near(p.stamina, recovery_stamina, "Cannot attack during guard recovery")
 	p.advance_guard(0.23)
 	check(p.guard_phase == "idle", "Guard recovery ends")
+	var default_windup = game.balance.guard_windup
+	var default_recovery = game.balance.guard_recovery
+	game.balance.guard_windup = 0.30
+	game.balance.guard_recovery = 0.40
+	p.guard_requested = true
+	p.advance_guard(0.0)
+	var guard_player: AnimationPlayer = p.get_node("AnimationPlayer")
+	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_raise").length / 0.30, "Custom windup scales animation speed")
+	p.advance_guard(0.29)
+	check(not p.blocking, "Custom windup delays blocking")
+	p.advance_guard(0.02)
+	check(p.blocking, "Custom windup enables blocking at configured time")
+	check(p.get_node("Visual/Shield").position.is_equal_approx(Vector2(35, 0)), "Hold keeps authored raised pose")
+	p.guard_requested = false
+	p.advance_guard(0.0)
+	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_lower").length / 0.40, "Custom recovery scales animation speed")
+	p.advance_guard(0.39)
+	check(p.guard_phase == "lower", "Custom recovery keeps action lock")
+	p.advance_guard(0.02)
+	check(p.guard_phase == "idle", "Custom recovery releases action lock")
+	check(p.get_node("Visual/Shield").position.is_equal_approx(Vector2(12, 25)), "Recovery keeps authored lowered pose")
+	game.balance.guard_windup = default_windup
+	game.balance.guard_recovery = default_recovery
 	p.hp = 20
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")

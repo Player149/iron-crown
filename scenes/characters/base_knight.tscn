@@ -1,3 +1,8 @@
-[gd_scene load_steps=2 format=3]
-[ext_resource type="PackedScene" path="res://scenes/fighter.tscn" id="1"]
-[node name="BaseKnight" instance=ExtResource("1")]
+[gd_scene format=3 uid="uid://dxnheuil3e8yo"]
+
+[ext_resource type="PackedScene" uid="uid://bby3uw6vl8tuo" path="res://scenes/fighter.tscn" id="1"]
+
+[node name="BaseKnight" unique_id=1294600561 instance=ExtResource("1")]
+
+[node name="Visual" parent="." index="1" unique_id=1812961861]
+position = Vector2(0, 0.71)

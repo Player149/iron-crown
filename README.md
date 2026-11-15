@@ -13,6 +13,8 @@ Godot 4.7.2에서 이 저장소의 `project.godot`을 가져온 뒤 실행(F6: �
 | 맵과 경험치 구역 | `scenes/main.tscn` → Zones 자식 이동 / 반경·경험치 Inspector |
 | 기사 이미지·검·방패 | `scenes/fighter.tscn` → Visual의 Sprite2D Texture |
 | 공격 애니메이션 | 같은 씬 → AnimationPlayer → swing 타임라인 |
+| 방패 속도·판정 시간 | `data/balance.tres` → Guard Windup(들기) / Guard Recovery(내리기), 초 단위 |
+| 방패 동작·위치 | `scenes/fighter.tscn` → AnimationPlayer → guard_raise / guard_lower 타임라인 |
 | 몬스터 이미지 | `scenes/monster.tscn` → Sprite2D |
 | 투사체 | `scenes/projectile.tscn`, `scripts/projectile.gd` |
 | 체력·스태미나·회복·적 수 | `data/balance.tres` Inspector |
@@ -51,7 +53,7 @@ python3 -m http.server 8080 --directory build/web
 
 ## 타이밍 전투 프로토타입 (main)
 
-공격: swing AnimationPlayer의 명중 이벤트(기본 0.2초)까지 선딜, 전체 애니메이션(기본 0.42초)이 끝날 때까지 후딜/행동 잠금. 방어: 방패 들기 0.14초 후 피해 감소 적용, 방패 내리기 0.22초 동안 공격/대시 잠금. 기존 대시를 회피로 활용. 공격·대시에서 기력 소모, 방패 들기는 기력 무료, 방어 유지·방어 성공 시 기력 소모. 일반 상태 기력 초당 35 회복, 그로기 지속시간 약 1.33초. 수치는 `scripts/balance.gd` Inspector에서 조정.
+공격: swing AnimationPlayer의 명중 이벤트(기본 0.2초)까지 선딜, 전체 애니메이션(기본 0.42초)이 끝날 때까지 후딜/행동 잠금. 방어: 방패 들기 0.10초 후 피해 감소 적용, 방패 내리기 0.16초 동안 공격/대시 잠금. 기존 대시를 회피로 활용. 공격·대시에서 기력 소모, 방패 들기는 기력 무료, 방어 유지·방어 성공 시 기력 소모. 일반 상태 기력 초당 35 회복, 그로기 지속시간 약 1.33초. 수치는 `data/balance.tres` Inspector에서 조정. Guard Windup / Guard Recovery를 바꾸면 방어 판정·행동 잠금과 애니메이션 재생 시간이 함께 바뀝니다. 타임라인 길이는 동작 편집용이며 실행 시 설정한 시간에 맞춰 재생됩니다.
 
 ## 저장과 기획
 
