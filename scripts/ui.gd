@@ -25,7 +25,7 @@ func _ready() -> void:
 		if arena.choice_open: return
 		arena.paused = true
 		show_pause(true))
-	for pair in [["Health", Color("e76078")], ["Groggy", Color("e1b459")], ["XP", Color("58bde4")]]:
+	for pair in [["Health", Color("e76078")], ["Stamina", Color("71c8a6")], ["Groggy", Color("e1b459")], ["XP", Color("58bde4")]]:
 		var fill = StyleBoxFlat.new()
 		fill.bg_color = pair[1]
 		fill.set_corner_radius_all(4)
@@ -213,9 +213,10 @@ func update_hud() -> void:
 	var p = arena.player
 	hud.get_node("Info/Name").text = "%s · Lv.%d" % [p.display_name, p.level]
 	hud.get_node("Info/Health").value = 100 * p.hp / p.max_hp
+	hud.get_node("Info/Stamina").value = 100 * p.stamina / p.max_stamina
 	hud.get_node("Info/Groggy").value = 100 * p.groggy / arena.balance.groggy_threshold
 	hud.get_node("Info/XP").value = 100 if p.level == 40 else 100 * p.xp / arena.balance.xp_needed(p.level)
-	hud.get_node("Info/Stats").text = "HP %d/%d   그로기 %d/%d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), floori(p.groggy), roundi(arena.balance.groggy_threshold), arena.run_gold, arena.run_kills, roundi(p.damage)]
+	hud.get_node("Info/Stats").text = "HP %d/%d · 기력 %d/%d · 그로기 %d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), arena.run_gold, arena.run_kills, roundi(p.damage)]
 	hud.get_node("Info/Status").text = ("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투")
 	if arena.mode == "boss" and arena.boss != null:
 		hud.get_node("Boss").text = "BOSS %s · %s\nHP %d / %d" % [arena.boss.display_name, time_text(arena.boss_timer), ceili(arena.boss.hp), roundi(arena.boss.max_hp)]
@@ -263,9 +264,9 @@ func refresh_layout(force: bool = false) -> void:
 	box.get_node("Help").text = "WASD 이동 · 좌클릭 공격 · 우클릭 막기
 Shift 달리기 · Space 대시 · E/R/Q 기술
 모바일: 조이스틱 + 전투 버튼 / 세로·가로 자동 전환"
-	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 150))
+	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 172))
 	place_hud("Pause", Rect2(width - 112, 16, 96, 48))
-	place_hud("Boss", Rect2(16, 180, width - 32, 54) if compact else Rect2(width / 2 - 160, 18, 320, 54))
+	place_hud("Boss", Rect2(16, 202, width - 32, 54) if compact else Rect2(width / 2 - 160, 18, 320, 54))
 	hud.get_node("Boss").add_theme_font_size_override("font_size", 15 if compact else 18)
 	hud.get_node("Leaderboard").visible = not compact
 	hud.get_node("Feed").visible = not compact
