@@ -28,6 +28,10 @@ func run() -> void:
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
 	near(p.stamina, 100, "Starting stamina")
+	check(p.facing == -PI / 2.0, "Stick fighter defaults to facing upward")
+	check(p.get_node("Visual/Body").texture.resource_path == "res://assets/Character_Base.png", "Base body uses supplied PNG")
+	check(p.get_node("Visual/WeaponPivot/Sword").texture.resource_path == "res://assets/Stick.png", "Starter weapon uses supplied stick")
+	check(not p.can_guard() and not p.get_node("Visual/Shield").visible, "Starter cannot guard and has no shield")
 	near(p.max_stamina, 100, "Maximum stamina stays constant at spawn")
 	check(p.get_node("AnimationPlayer").has_animation("guard_raise"), "Guard raise animation available")
 	check(p.get_node("AnimationPlayer").has_animation("guard_lower"), "Guard recovery animation available")
@@ -56,6 +60,7 @@ func run() -> void:
 	check(p.stamina < stamina_before_dash, "Dash consumes stamina when available")
 	p.dash_left = 0
 	p.cooldown.dash = 0
+	p.evolutions.append("test_guard")
 	p.guard_requested = true
 	var stamina_before_guard_raise = p.stamina
 	p.advance_guard(0.0)
@@ -99,6 +104,8 @@ func run() -> void:
 	check(p.guard_phase == "idle", "Custom recovery ends via animation event")
 	game.balance.guard_windup = default_windup
 	game.balance.guard_recovery = default_recovery
+	p.evolutions.clear()
+	p.update_visual()
 	p.hp = 20
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
