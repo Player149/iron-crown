@@ -56,7 +56,9 @@ func run() -> void:
 	p.dash_left = 0
 	p.cooldown.dash = 0
 	p.guard_requested = true
+	var stamina_before_guard_raise = p.stamina
 	p.advance_guard(0.0)
+	near(p.stamina, stamina_before_guard_raise, "Guard raise has no stamina cost")
 	check(not p.blocking and p.guard_phase == "raise", "Guard windup is vulnerable")
 	p.advance_guard(0.15)
 	check(p.blocking and p.guard_phase == "hold", "Guard only blocks after startup")
@@ -94,10 +96,10 @@ func run() -> void:
 	near(p.groggy, 50, "Invulnerable hit does not build groggy")
 	p.invuln = 0
 	p.add_groggy(50)
-	near(p.groggy_left, 2, "Threshold starts two-second groggy")
+	near(p.groggy_left, 4.0 / 3.0, "Threshold starts shortened groggy")
 	check(not p.can_act(), "Groggy disables actions")
 	p.add_groggy(100)
-	near(p.groggy_left, 2, "Hits cannot extend active groggy")
+	near(p.groggy_left, 4.0 / 3.0, "Hits cannot extend active groggy")
 	game.touch_move = Vector2.RIGHT
 	var old_position: Vector2 = p.position
 	p.tick(0.5)
