@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://bby3uw6vl8tuo"]
 
 [ext_resource type="Script" uid="uid://dch4ekjwaqedh" path="res://scripts/fighter.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://dmvmclop6ushf" path="res://assets/knight.svg" id="2"]
-[ext_resource type="Texture2D" uid="uid://dsgi40fmqcr2m" path="res://assets/sword.svg" id="3"]
+[ext_resource type="Texture2D" path="res://assets/Character_Base.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/Stick.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://cn8uhetxh0fep" path="res://assets/shield.svg" id="4"]
 [ext_resource type="FontFile" uid="uid://c8ung84ge5tsm" path="res://assets/NotoSansKR.ttf" id="5"]
 
@@ -183,9 +183,10 @@ script = ExtResource("1")
 shape = SubResource("Body")
 
 [node name="Visual" type="Node2D" parent="." unique_id=1812961861]
+texture_filter = 1
 
 [node name="Body" type="Sprite2D" parent="Visual" unique_id=1142783322]
-scale = Vector2(0.8, 0.8)
+scale = Vector2(1.2, 1.2)
 texture = ExtResource("2")
 
 [node name="Shield" type="Sprite2D" parent="Visual" unique_id=515683880]
@@ -194,10 +195,12 @@ scale = Vector2(0.65, 0.65)
 texture = ExtResource("4")
 
 [node name="WeaponPivot" type="Node2D" parent="Visual" unique_id=583824191]
+position = Vector2(21, -4)
 
 [node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot" unique_id=1827909850]
-position = Vector2(48, -15)
-scale = Vector2(0.7, 0.7)
+position = Vector2(15, -8)
+rotation = -1.5707964
+scale = Vector2(1.0, 1.0)
 texture = ExtResource("3")
 
 [node name="AttackArea" type="Area2D" parent="." unique_id=1810657679]
