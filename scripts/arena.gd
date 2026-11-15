@@ -200,6 +200,8 @@ func deal_damage(target, amount: float, source) -> float:
 	if duel:
 		target.combat_left = balance.combat_duration
 		source.combat_left = balance.combat_duration
+		# Last successful hit by each distinct attacker, within the combat window.
+		target.damage_contributors[source.get_instance_id()] = elapsed
 	var perfect_guard = target is CrownFighter and target.is_perfect_guard()
 	var was_blocking = target is CrownFighter and target.absorb_guard_hit() and target.groggy_left <= 0
 	var reduction = target.armor / (100.0 + target.armor)
@@ -209,6 +211,7 @@ func deal_damage(target, amount: float, source) -> float:
 		if source is CrownFighter:
 			# An attack already costs stamina at startup: blocking adds a separate penalty.
 			source.stamina = maxf(0.0, source.stamina - balance.attack_stamina_cost * balance.blocked_attack_stamina_multiplier)
+			if source.stamina <= 0.0: source.trigger_exhaustion()
 			if perfect_guard:
 				target.perfect_guard_left = 0.0
 				source.add_groggy(balance.perfect_guard_groggy)
@@ -226,6 +229,13 @@ func deal_damage(target, amount: float, source) -> float:
 	if source == player or target == player: sound("hit", player)
 	if target.hp <= 0: kill_target(target, source)
 	return final
+
+func recent_contributor_count(victim) -> int:
+	if not victim is CrownFighter: return 1
+	var count = 0
+	for timestamp in victim.damage_contributors.values():
+		if elapsed - float(timestamp) <= balance.combat_duration: count += 1
+	return maxi(1, count)
 
 func kill_target(target, killer) -> void:
 	if not target.alive: return
@@ -245,17 +255,23 @@ func kill_target(target, killer) -> void:
 			if participants.filter(func(f): return f != boss and f.alive).is_empty(): finish_boss(false)
 		return
 	if killer is CrownFighter:
+		var contributor_count = recent_contributor_count(target)
 		killer.kills += 1
 		add_xp(killer, 110 + target.level * 25)
-		killer.hp = killer.max_hp
+		if contributor_count == 1:
+			killer.hp = killer.max_hp
+		else:
+			killer.hp = minf(killer.max_hp, killer.hp + killer.max_hp / contributor_count)
 		killer.combat_left = 0
 		killer.reset_groggy()
 		killer.stamina = killer.max_stamina
-		float_text(killer.position, "완전 회복!", Color("7be2b0"))
+		killer.exhaustion_left = 0.0
+		float_text(killer.position, "완전 회복!" if contributor_count == 1 else "체력 회복 (기여자 %d명)" % contributor_count, Color("7be2b0"))
 		if killer.is_player:
 			run_kills += 1
 			run_gold += roundi((70 + target.level * 20) * killer.gold_bonus)
 		ui.feed("%s → %s" % [killer.display_name, target.display_name])
+	if target is CrownFighter: target.damage_contributors.clear()
 	if target == player:
 		mode = "gameover"
 		choice_open = false
@@ -326,7 +342,7 @@ func start_boss(manual: bool = false) -> void:
 	snapshots.clear()
 	for f in fighters:
 		var values = f.snapshot_stats()
-		for key in ["position", "hp", "stamina", "guard_phase", "guard_time", "perfect_guard_left", "attack_lock", "groggy", "groggy_decay_left", "groggy_immunity", "alive", "invuln", "combat_left", "no_hit_time", "groggy_left", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key == "cooldown" else f.get(key)
+		for key in ["position", "hp", "stamina", "exhaustion_left", "damage_contributors", "guard_phase", "guard_time", "perfect_guard_left", "attack_lock", "groggy", "groggy_decay_left", "groggy_immunity", "alive", "invuln", "combat_left", "no_hit_time", "groggy_left", "dash_left", "blocking", "dash_velocity", "cooldown"]: values[key] = f.get(key).duplicate() if key in ["cooldown", "damage_contributors"] else f.get(key)
 		snapshots.append({"fighter": f, "values": values})
 		if not participants.has(f):
 			f.alive = false
@@ -338,6 +354,8 @@ func start_boss(manual: bool = false) -> void:
 		f.combat_left = 0
 		f.reset_groggy()
 		f.reset_guard()
+		f.exhaustion_left = 0.0
+		f.damage_contributors.clear()
 		f.invuln = 1
 		f.boss_damage = 0
 		f.boss_kills = 0
@@ -367,7 +385,7 @@ func finish_boss(victory: bool) -> void:
 		elif victory: reward = roundi(100000.0 * participants.size() * minf(1, player.boss_damage / boss.max_hp))
 	run_gold += reward
 	for s in snapshots:
-		for key in s.values: s.fighter.set(key, s.values[key])
+		for key in s.values: s.fighter.set(key, s.values[key].duplicate() if key in ["cooldown", "damage_contributors"] else s.values[key])
 		s.fighter.reset_guard()
 		s.fighter.boss_flag = false
 		s.fighter.visible = s.fighter.alive
@@ -398,6 +416,8 @@ func revive() -> void:
 	player.reset_groggy()
 	player.reset_guard()
 	player.stamina = player.max_stamina
+	player.exhaustion_left = 0.0
+	player.damage_contributors.clear()
 	player.invuln = 3
 	player.position = balance.world_size / 2
 	mode = "play"
