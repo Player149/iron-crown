@@ -28,6 +28,7 @@ func run() -> void:
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
 	near(p.stamina, 100, "Starting stamina")
+	near(p.max_stamina, 100, "Maximum stamina stays constant at spawn")
 	check(p.get_node("AnimationPlayer").has_animation("guard_raise"), "Guard raise animation available")
 	check(p.get_node("AnimationPlayer").has_animation("guard_lower"), "Guard recovery animation available")
 	check(p.get_node("AnimationPlayer").autoplay.is_empty(), "Combat animation does not autoplay on spawn")
@@ -103,6 +104,7 @@ func run() -> void:
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
 	for i in 38: p.grow_level()
 	near(p.max_hp, 400, "Level 40 base HP")
+	near(p.max_stamina, 100, "Level-ups do not increase maximum stamina")
 	p.reset_groggy()
 	p.hp = p.max_hp
 	p.invuln = 0
@@ -175,6 +177,52 @@ func run() -> void:
 	near(p.hp, p.max_hp, "Knight kill restores HP")
 	near(p.groggy, 0, "Knight kill clears groggy meter")
 	near(p.groggy_left + p.combat_left, 0, "Knight kill clears groggy and combat")
+	# Exhaustion: an exact zero expenditure causes a one-second action lock.
+	p.stamina = 10
+	check(not p.spend_stamina(10), "Exact stamina depletion interrupts action")
+	near(p.stamina, 0, "Exhaustion starts at zero stamina")
+	near(p.exhaustion_left, 1, "Exhaustion lasts one second")
+	check(not p.can_act(), "Exhausted fighter cannot act")
+	var exhausted_guard_phase = p.guard_phase
+	p.guard_requested = true
+	p.advance_guard(0.1)
+	check(p.guard_phase == exhausted_guard_phase, "Exhaustion prevents guarding")
+	p.tick(0.5)
+	near(p.stamina, 0, "Stamina stays empty during exhaustion")
+	check(not p.can_act(), "Exhaustion still active after half second")
+	p.tick(0.51)
+	check(p.can_act() and p.stamina > 0, "Actions and stamina regenerate after exhaustion")
+	p.stamina = 0
+	p.exhaustion_left = 1
+	# Solo kill heals to full and refills stamina even if exhausted.
+	var solo_victim = game.fighters[2]
+	p.hp = 35
+	solo_victim.damage_contributors[p.get_instance_id()] = game.elapsed
+	game.kill_target(solo_victim, p)
+	near(p.hp, p.max_hp, "Solo contributor gets full health")
+	near(p.stamina, p.max_stamina, "Kill always refills stamina")
+	near(p.exhaustion_left, 0, "Kill clears exhaustion")
+	# Two distinct attackers within the combat window halve the final hitter's reward.
+	var shared_victim = game.fighters[3]
+	var ally = game.fighters[4]
+	shared_victim.damage_contributors[p.get_instance_id()] = game.elapsed
+	shared_victim.damage_contributors[ally.get_instance_id()] = game.elapsed
+	shared_victim.damage_contributors[ally.get_instance_id()] = game.elapsed
+	check(game.recent_contributor_count(shared_victim) == 2, "Repeated hits from same attacker count once")
+	p.hp = 20
+	p.stamina = 15
+	game.kill_target(shared_victim, p)
+	near(p.hp, 20 + p.max_hp * 0.5, "Two contributors restore half of max HP")
+	near(p.stamina, p.max_stamina, "Assisted kill still restores full stamina")
+	# Old damage contributions expire using the same combat-duration window.
+	var stale_victim = game.fighters[5]
+	game.elapsed += game.balance.combat_duration + 0.1
+	stale_victim.damage_contributors[ally.get_instance_id()] = 0.0
+	stale_victim.damage_contributors[p.get_instance_id()] = game.elapsed
+	check(game.recent_contributor_count(stale_victim) == 1, "Expired contribution no longer divides healing")
+	p.hp = 20
+	game.kill_target(stale_victim, p)
+	near(p.hp, p.max_hp, "Expired second contributor allows full heal")
 	game.start_game()
 	p = game.player
 	game.add_xp(p, 1000000)
