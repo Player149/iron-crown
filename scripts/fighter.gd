@@ -52,9 +52,9 @@ var groggy_decay_left: float = 0
 var groggy_immunity: float = 0
 var dash_left: float = 0
 var dash_velocity: Vector2 = Vector2.ZERO
-var facing: float = 0
+var facing: float = -PI / 2.0
 var evolutions: Array = []
-var class_name_text: String = "초보 기사"
+var class_name_text: String = "나뭇가지 전사"
 var cooldown: Dictionary = {"attack": 0.0, "dash": 0.0, "e": 0.0, "r": 0.0, "q": 0.0}
 var base_stats: Dictionary
 var ai_target
@@ -79,7 +79,7 @@ func _ready() -> void:
 	base_stats = snapshot_stats()
 	if is_player:
 		Meta.apply_runes(self)
-	$Visual/Body.modulate = tint
+	$Visual/Body.modulate = Color.WHITE
 	update_visual()
 
 func snapshot_stats() -> Dictionary:
@@ -130,7 +130,7 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
-	guard_requested = (Input.is_action_pressed("block") or arena.touch_block)
+	guard_requested = can_guard() and (Input.is_action_pressed("block") or arena.touch_block)
 	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
 	if guard_phase != "idle" or guard_requested: multiplier *= 0.5
 	elif attack_lock > 0: multiplier *= 0.75
@@ -153,7 +153,7 @@ func ai_control(dt: float) -> void:
 	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
 	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
 	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	guard_requested = ai_block > 0
+	guard_requested = can_guard() and ai_block > 0
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
 	velocity = (offset.normalized() * toward + side) * speed * (0.5 if guard_phase != "idle" or guard_requested else 1.0)
 	if distance < 92: attack()
@@ -164,6 +164,10 @@ func ai_control(dt: float) -> void:
 
 func can_act() -> bool:
 	return alive and groggy_left <= 0 and exhaustion_left <= 0.0
+
+func can_guard() -> bool:
+	# The starting stick fighter only attacks; guarding unlocks after evolving.
+	return not evolutions.is_empty()
 
 func trigger_exhaustion() -> void:
 	if exhaustion_left > 0.0 or not alive: return
@@ -192,7 +196,7 @@ func advance_guard(dt: float) -> void:
 		guard_requested = false
 		return
 	perfect_guard_left = maxf(0.0, perfect_guard_left - dt)
-	if guard_phase == "idle" and guard_requested and attack_lock <= 0 and dash_left <= 0:
+	if guard_phase == "idle" and guard_requested and can_guard() and attack_lock <= 0 and dash_left <= 0:
 		guard_phase = "raise"
 		play_guard_animation("guard_raise", arena.balance.guard_windup)
 	elif guard_phase == "hold":
@@ -363,10 +367,12 @@ func attack_color() -> Color:
 	return Color("ff8258") if is_player and Meta.rune_level("ember") > 0 else tint.lightened(0.3)
 
 func update_visual() -> void:
-	$Visual.rotation = facing
+	# Source sprite faces upward (-PI/2); align it with combat facing.
+	$Visual.rotation = facing + PI / 2.0
 	$Visual.scale = Vector2.ONE * body_scale
+	$Visual/Shield.visible = can_guard()
 	$Visual/Shield.modulate = Color("bfefff") if blocking else (Color("aebccc") if guard_phase == "raise" else Color("6d798b"))
-	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else tint)
+	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else Color.WHITE)
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
 	queue_redraw()
