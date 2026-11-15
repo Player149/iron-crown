@@ -11,7 +11,7 @@ Godot 4.7.2에서 이 저장소의 `project.godot`을 가져온 뒤 실행(F6: �
 | 편집할 내용 | 파일 / 에디터 위치 |
 |---|---|
 | 맵과 경험치 구역 | `scenes/main.tscn` → Zones 자식 이동 / 반경·경험치 Inspector |
-| 기사 이미지·검·방패 | `scenes/fighter.tscn` → Visual의 Sprite2D Texture |
+| 기본형 몸체·나뭇가지·방패 | `scenes/fighter.tscn` → `Visual/Body`의 `Character_Base.png`, `WeaponPivot/Sword`의 `Stick.png`, `Visual/Shield`(진화 후에만 표시) |
 | 공격 애니메이션 | 같은 씬 → AnimationPlayer → swing 타임라인 |
 | 방패 속도·판정 시간 | `data/balance.tres` → Guard Windup(들기) / Guard Recovery(내리기), 초 단위 |
 | 방패 동작·위치 | `scenes/fighter.tscn` → AnimationPlayer → guard_raise / guard_lower 타임라인 |
@@ -24,6 +24,10 @@ Godot 4.7.2에서 이 저장소의 `project.godot`을 가져온 뒤 실행(F6: �
 | 효과음 | `assets/*.wav` |
 
 현재 SVG와 WAV는 교체 가능한 기본 에셋입니다. 이미지 변경만으로 판정 범위가 변하지는 않습니다. 기사의 `attack_range_override` 또는 공통 balance의 `attack_range`를 함께 조절하세요. 기술 동작은 `fighter.gd`의 skill 함수, 피해·보스·성장은 `arena.gd`에서 수정합니다.
+
+## 기본 캐릭터(나뭇가지 전사)
+
+기본형은 GitHub에 업로드된 64×64 투명 PNG(`assets/Character_Base.png`, `assets/Stick.png`)를 사용합니다. 위쪽(-Y)을 기본 정면으로 두며 `facing`은 타격 판정을 향하는 월드 각도, `Visual.rotation = facing + PI/2`는 위를 향해 그려진 몸체 스프라이트의 시각 회전값입니다. 몸체와 스틱은 독립 Sprite2D로 연결했고 `WeaponPivot` 회전 애니메이션을 재사용합니다. 픽셀 선명도를 위해 Visual의 텍스처 필터는 Nearest입니다. 기본형은 막기가 불가능하고 방패가 숨겨지며, 기존 진화 직업부터 막기가 가능해집니다. 이동·대시·기존 성장 시스템은 유지됩니다.
 
 ## 조작
 
