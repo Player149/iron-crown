@@ -1,8 +1,9 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 [ext_resource type="Script" path="res://scripts/fighter.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/knight.svg" id="2"]
 [ext_resource type="Texture2D" path="res://assets/sword.svg" id="3"]
 [ext_resource type="Texture2D" path="res://assets/shield.svg" id="4"]
+[ext_resource type="FontFile" path="res://assets/NotoSansKR.ttf" id="5"]
 [sub_resource type="CircleShape2D" id="Body"]
 radius = 25.0
 [sub_resource type="CircleShape2D" id="Attack"]
@@ -20,6 +21,9 @@ tracks/0/path = NodePath("Visual/WeaponPivot:rotation")
 tracks/0/keys = {"times": PackedFloat32Array(0, 0.08, 0.2, 0.32), "transitions": PackedFloat32Array(1, 1, 1, 1), "update": 0, "values": [-1.1, -0.8, 0.9, 0.0]}
 [sub_resource type="AnimationLibrary" id="Anims"]
 _data = {"RESET": SubResource("Reset"), "swing": SubResource("Swing")}
+[sub_resource type="Theme" id="KnightTheme"]
+default_font = ExtResource("5")
+default_font_size = 13
 [node name="Fighter" type="CharacterBody2D"]
 collision_layer = 1
 collision_mask = 0
@@ -48,6 +52,7 @@ shape = SubResource("Attack")
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 libraries = {&"": SubResource("Anims")}
 [node name="NameLabel" type="Label" parent="."]
+theme = SubResource("KnightTheme")
 offset_left = -90.0
 offset_top = -64.0
 offset_right = 90.0

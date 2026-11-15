@@ -1,3 +1,11 @@
+# 2026-11-15 확인 및 후속 작업
+
+- Godot 4.7.2로 에디터/CI 버전 기준을 통일.
+- 배포 사이트 HTTP 200 및 브라우저 메뉴·전장 렌더링을 확인. 전장 AI 이름 라벨에 한글 폰트를 적용.
+- 기존 HTML 세이브는 동일 origin에서 `ironCrownMeta`를 새 세이브가 없을 때 가져오도록 구현되어 있음. 현재 브라우저 테스트 프로필에는 사용자의 기존 데이터가 없어 실제 세이브 이전은 미확인.
+- 공격 피해가 휘두르기 시작 0.2초 후 적용되도록 조정. 자동 검사 36개 통과.
+- 실제 휴대폰 터치 조작은 연결된 기기가 없어 미확인.
+
 # 2026-09-30 세로·가로 자동 대응
 
 - 화면 비율에 맞춰 논리 해상도를 변경하고 메뉴·HUD·팝업을 재배치합니다.
@@ -14,7 +22,7 @@
 - 개발 원본: https://github.com/Player149/iron-crown
 - 성공한 자동 빌드/배포: https://github.com/Player149/iron-crown/actions/runs/35612093824
 - 배포 코드 커밋: 9b7e069efe66ec164fce3356f9d23b388d556506
-- Godot 4.5.1 에디터 import, 핵심 자동 검증 34개, Web release export 성공. GitHub에서도 같은 테스트 및 배포 성공.
+- Godot 4.5.1 에디터 import, 핵심 자동 검증 34개, Web release export 성공. GitHub에서도 같은 테스트 및 배포 성공. 이후 편집기·CI는 Godot 4.7.2로 통일.
 - HTML / JS / PCK / WASM / service worker / manifest 모두 HTTP 200 확인.
 - 확인용 클라우드 브라우저는 WebGL2 미지원으로 실제 플레이 검증 불가. WebGL2 지원 브라우저와 실제 휴대폰에서 플레이·터치·저장 이전은 후속 확인 필요.
 - 기존 사용자 메인 사이트 Player149.github.io는 변경하지 않음.

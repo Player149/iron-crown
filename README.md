@@ -2,11 +2,11 @@
 
 [게임 실행](https://player149.github.io/iron-crown/) · [배포 현황](https://github.com/Player149/iron-crown/actions) · [검증 결과와 제한](docs/STATUS.md)
 
-Godot 4.5.1 / GDScript / Compatibility 렌더러로 이식한 싱글플레이 아레나 게임입니다. 원본 HTML을 감싼 형태가 아니라 Godot 씬·노드·리소스·AnimationPlayer로 구성했습니다.
+Godot 4.7.2 / GDScript / Compatibility 렌더러로 이식한 싱글플레이 아레나 게임입니다. 원본 HTML을 감싼 형태가 아니라 Godot 씬·노드·리소스·AnimationPlayer로 구성했습니다.
 
 ## 열기 / 편집
 
-Godot 4.5.1에서 이 저장소의 `project.godot`을 가져온 뒤 실행(F6: 현재 씬, F5: 게임)합니다. Android Godot 에디터에서도 같은 폴더를 열 수 있습니다. PC와 모바일은 같은 파일 구조를 사용하며 Git으로 커밋·푸시·풀합니다. 기기 사이의 동기화는 자동 파일 복사가 아니라 Git 변경사항 동기화입니다.
+Godot 4.7.2에서 이 저장소의 `project.godot`을 가져온 뒤 실행(F6: 현재 씬, F5: 게임)합니다. Android Godot 에디터에서도 같은 폴더를 열 수 있습니다. PC와 모바일은 같은 파일 구조를 사용하며 Git으로 커밋·푸시·풀합니다. 기기 사이의 동기화는 자동 파일 복사가 아니라 Git 변경사항 동기화입니다.
 
 | 편집할 내용 | 파일 / 에디터 위치 |
 |---|---|

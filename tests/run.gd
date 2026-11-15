@@ -28,6 +28,17 @@ func run() -> void:
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
 	near(p.max_stamina, 100, "Starting stamina")
+	var attack_target = game.fighters[1]
+	p.position = Vector2(1000, 1000)
+	attack_target.position = p.position + Vector2(80, 0)
+	p.facing = 0
+	p.combat_left = 0
+	p.cooldown.attack = 0
+	var hp_before_swing = attack_target.hp
+	p.attack()
+	near(attack_target.hp, hp_before_swing, "Attack waits for swing hit timing")
+	p._process(0.201)
+	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
 	p.hp = 20
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
