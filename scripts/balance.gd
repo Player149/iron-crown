@@ -7,11 +7,12 @@ extends Resource
 @export var final_hp: float = 400.0
 @export_category("Groggy - provisional balance")
 @export var groggy_threshold: float = 100.0
-@export var groggy_hit: float = 20.0
-@export var groggy_block: float = 30.0
-@export var groggy_duration: float = 1.3333333
-@export var groggy_decay_delay: float = 3.0
-@export var groggy_decay_rate: float = 15.0
+@export var groggy_hit: float = 6.0
+@export var groggy_block: float = 0.0
+@export var groggy_duration: float = 2.0
+@export var groggy_decay_delay: float = 0.0
+@export var groggy_decay_rate: float = 2.0
+@export var perfect_guard_groggy: float = 60.0
 @export var groggy_recovery_immunity: float = 1.0
 @export_category("Stamina - timed combat")
 @export var stamina_max: float = 100.0
@@ -21,6 +22,8 @@ extends Resource
 @export var guard_start_cost: float = 0.0
 @export var guard_drain_per_second: float = 13.0
 @export var guard_hit_cost: float = 12.0
+@export var blocked_attack_stamina_multiplier: float = 1.5
+@export var perfect_guard_window: float = 0.10
 @export_category("Guard timing - seconds, animation scales to match")
 @export_range(0.01, 2.0, 0.01, "or_greater") var guard_windup: float = 0.10
 @export_range(0.01, 2.0, 0.01, "or_greater") var guard_recovery: float = 0.16
