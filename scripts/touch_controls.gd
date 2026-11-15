@@ -17,7 +17,7 @@ func button_layout() -> Array:
 	if size.x < size.y:
 		return [
 			["attack", "공격", Vector2(size.x - 52, size.y - 90), 40.0],
-			["block", "막기", Vector2(size.x - 138, size.y - 52), 32.0],
+			
 			["dash", "대시", Vector2(size.x - 138, size.y - 136), 32.0],
 			["e", "E", Vector2(size.x - 212, size.y - 226), 29.0],
 			["r", "R", Vector2(size.x - 132, size.y - 226), 29.0],
@@ -26,7 +26,7 @@ func button_layout() -> Array:
 		]
 	return [
 		["attack", "공격", Vector2(size.x - 66, size.y - 84), 42.0],
-		["block", "막기", Vector2(size.x - 155, size.y - 53), 32.0],
+		
 		["dash", "대시", Vector2(size.x - 148, size.y - 136), 32.0],
 		["e", "E", Vector2(size.x - 226, size.y - 63), 26.0],
 		["r", "R", Vector2(size.x - 226, size.y - 123), 26.0],
@@ -70,7 +70,6 @@ func _input(event: InputEvent) -> void:
 				arena.touch_move = Vector2.ZERO
 			active_buttons.erase(event.index)
 		arena.touch_attack = active_buttons.values().has("attack")
-		arena.touch_block = active_buttons.values().has("block")
 		arena.touch_run = active_buttons.values().has("run")
 	elif event is InputEventScreenDrag and event.index == joystick_id:
 		knob = (event.position - origin).limit_length(50)
