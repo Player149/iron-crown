@@ -228,7 +228,10 @@ func kill_target(target, killer) -> void:
 	fx_ring(target.position, 70, Color("ff627f"), 0.5)
 	if not target is CrownFighter:
 		target.respawn_timer = randf_range(8, 14)
-		if killer is CrownFighter: add_xp(killer, 48 if target.brute else 28)
+		if killer is CrownFighter:
+			add_xp(killer, 48 if target.brute else 28)
+			if int(killer.perks.get("siphon", 0)) > 0:
+				killer.hp = minf(killer.max_hp, killer.hp + killer.max_hp * 0.04 * int(killer.perks["siphon"]))
 		return
 	if mode == "boss":
 		if target == boss: boss_finish_pending = true
@@ -243,8 +246,7 @@ func kill_target(target, killer) -> void:
 		killer.combat_left = 0
 		killer.reset_groggy()
 		float_text(killer.position, "완전 회복!", Color("7be2b0"))
-		if int(killer.perks.get("siphon", 0)) > 0:
-			killer.hp = minf(killer.max_hp, killer.hp + killer.max_hp * 0.04 * int(killer.perks["siphon"]))
+		# Player-versus-player kills already fully heal; siphon applies to monster kills.
 		if killer.is_player:
 			run_kills += 1
 			run_gold += roundi((70 + target.level * 20) * killer.gold_bonus)
