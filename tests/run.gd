@@ -27,6 +27,9 @@ func run() -> void:
 	var enemy = game.fighters[1]
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
+	near(p.stamina, 100, "Starting stamina")
+	check(p.get_node("AnimationPlayer").has_animation("guard_raise"), "Guard raise animation available")
+	check(p.get_node("AnimationPlayer").has_animation("guard_lower"), "Guard recovery animation available")
 	check(p.get_node("AnimationPlayer").autoplay.is_empty(), "Combat animation does not autoplay on spawn")
 	var attack_target = game.fighters[1]
 	p.position = Vector2(1000, 1000)
@@ -36,11 +39,36 @@ func run() -> void:
 	p.cooldown.attack = 0
 	var hp_before_swing = attack_target.hp
 	p.attack()
+	near(p.stamina, 90, "Attack consumes stamina")
+	check(p.attack_lock > 0, "Attack startup/recovery action lock")
 	near(attack_target.hp, hp_before_swing, "Attack waits for swing hit timing")
 	p.get_node("AnimationPlayer").advance(0.201)
 	await process_frame
 	check(p.position.is_equal_approx(Vector2(1000, 1000)), "Attack animation preserves world position")
 	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
+	var stamina_before_dash = p.stamina
+	p.dash(Vector2.RIGHT)
+	near(p.stamina, stamina_before_dash, "Cannot dash-cancel attack recovery")
+	p.attack_lock = 0
+	p.cooldown.dash = 0
+	p.dash(Vector2.RIGHT)
+	check(p.stamina < stamina_before_dash, "Dash consumes stamina when available")
+	p.dash_left = 0
+	p.cooldown.dash = 0
+	p.guard_requested = true
+	p.advance_guard(0.0)
+	check(not p.blocking and p.guard_phase == "raise", "Guard windup is vulnerable")
+	p.advance_guard(0.15)
+	check(p.blocking and p.guard_phase == "hold", "Guard only blocks after startup")
+	p.guard_requested = false
+	p.advance_guard(0.01)
+	check(not p.blocking and p.guard_phase == "lower", "Guard recovery cannot block")
+	p.attack_lock = 0
+	var recovery_stamina = p.stamina
+	p.attack()
+	near(p.stamina, recovery_stamina, "Cannot attack during guard recovery")
+	p.advance_guard(0.23)
+	check(p.guard_phase == "idle", "Guard recovery ends")
 	p.hp = 20
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
