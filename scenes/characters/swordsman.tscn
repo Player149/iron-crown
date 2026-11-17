@@ -1,0 +1,170 @@
+[gd_scene format=3 uid="uid://c26fyh738krdc"]
+
+[ext_resource type="PackedScene" uid="uid://bby3uw6vl8tuo" path="res://scenes/fighter.tscn" id="1"]
+[ext_resource type="Script" uid="uid://od6xat0aikfm" path="res://scripts/characters/swordsman.gd" id="2"]
+[ext_resource type="Resource" path="res://data/characters/templates/swordsman.tres" id="3"]
+[ext_resource type="Texture2D" uid="uid://w7nc5ilhxthf" path="res://assets/sword_A.png" id="4"]
+
+[ext_resource type="Texture2D" path="res://assets/Shield_Small.png" id="5"]
+[ext_resource type="Script" path="res://scripts/components/shield_guard.gd" id="6"]
+
+[sub_resource type="Animation" id="Reset"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/WeaponPivot1:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Visual/WeaponPivot1/WeaponPivot2:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.0]
+}
+
+[sub_resource type="Animation" id="Swing"]
+resource_name = "swing"
+length = 0.42
+step = 0.01
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/WeaponPivot1:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.12, 0.2, 0.31, 0.42),
+"transitions": PackedFloat32Array(1, 1, 0.22531253, 1, 3.2490067),
+"update": 0,
+"values": [0.0, -0.3298672286269279, 2.645919146023404, 2.8658306317746898, 0.0]
+}
+tracks/1/type = "method"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0.2),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"resolve_attack_hit"
+}]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Visual/WeaponPivot1/WeaponPivot2:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.28, 0.42),
+"transitions": PackedFloat32Array(1, 0.42044818, 1, 0.12499998),
+"update": 0,
+"values": [0.0, -0.6981317007977318, 0.7347836150896131, 0.0]
+}
+
+[sub_resource type="Animation" id="GuardLower"]
+resource_name = "guard_lower"
+length = 0.22
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/Shield:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.22),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(16, -20), Vector2(20, 6)]
+}
+tracks/1/type = "method"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Guard")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0.219),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"on_guard_lowered"
+}]
+}
+
+[sub_resource type="Animation" id="GuardRaise"]
+resource_name = "guard_raise"
+length = 0.14
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/Shield:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.14),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(20, 6), Vector2(16, -20)]
+}
+tracks/1/type = "method"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Guard")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0.139),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"on_guard_raised"
+}]
+}
+
+[sub_resource type="AnimationLibrary" id="Anims"]
+resource_local_to_scene = true
+_data = {
+&"RESET": SubResource("Reset"),
+&"guard_lower": SubResource("GuardLower"),
+&"guard_raise": SubResource("GuardRaise"),
+&"swing": SubResource("Swing")
+}
+
+[node name="Swordsman" unique_id=1959509640 instance=ExtResource("1")]
+script = ExtResource("2")
+display_name = "검사"
+definition = ExtResource("3")
+
+[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot1/WeaponPivot2" parent_id_path=PackedInt32Array(1827778914) index="0" unique_id=962260256]
+position = Vector2(-15, -20)
+rotation = 0.7853982
+scale = Vector2(1.2, 1.2)
+texture = ExtResource("4")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." index="5" unique_id=426838042]
+libraries/ = SubResource("Anims")
+
+[node name="Shield" type="Sprite2D" parent="Visual" index="2"]
+position = Vector2(20, 6)
+scale = Vector2(1.2, 1.2)
+texture = ExtResource("5")
+
+[node name="Guard" type="Node2D" parent="."]
+script = ExtResource("6")

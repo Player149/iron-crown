@@ -24,6 +24,8 @@ func run() -> void:
 	game.set_physics_process(false)
 	game.start_game()
 	var p = game.player
+	# Explicit advance() calls control animation time in this test.
+	p.get_node("AnimationPlayer").callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	var enemy = game.fighters[1]
 	check(game.fighters.size() == 16 and game.monsters.size() == 28, "Arena population")
 	near(p.max_hp, 100, "Starting HP")
@@ -33,8 +35,8 @@ func run() -> void:
 	check(p.get_node("Visual/WeaponPivot1/WeaponPivot2/Sword").texture.resource_path == "res://assets/Stick.png", "Starter weapon uses supplied stick")
 	check(not p.can_guard() and not p.has_node("Visual/Shield"), "Starter cannot guard and has no shield")
 	near(p.max_stamina, 100, "Maximum stamina stays constant at spawn")
-	check(p.get_node("AnimationPlayer").has_animation("guard_raise"), "Guard raise animation available")
-	check(p.get_node("AnimationPlayer").has_animation("guard_lower"), "Guard recovery animation available")
+	check(not p.get_node("AnimationPlayer").has_animation("guard_raise"), "Starter has no guard raise animation")
+	check(not p.get_node("AnimationPlayer").has_animation("guard_lower"), "Starter has no guard recovery animation")
 	check(p.get_node("AnimationPlayer").autoplay.is_empty(), "Combat animation does not autoplay on spawn")
 	var attack_target = game.fighters[1]
 	p.position = Vector2(1000, 1000)
@@ -60,48 +62,57 @@ func run() -> void:
 	check(p.stamina < stamina_before_dash, "Dash consumes stamina when available")
 	p.dash_left = 0
 	p.cooldown.dash = 0
-	p.evolutions.append("test_guard")
-	p.guard_requested = true
+	# Guard coverage uses the shield archetype, not a guard bolted onto the starter.
+	var defender = load("res://scenes/characters/shieldbearer.tscn").instantiate()
+	defender.arena = game
+	defender.is_player = true
+	defender.position = p.position
+	game.get_node("Actors").add_child(defender)
+	game.fighters.append(defender)
+	game.player = defender
+	p = defender
+	p.get_node("AnimationPlayer").callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	p.guard.requested = true
 	var stamina_before_guard_raise = p.stamina
-	p.advance_guard(0.0)
+	p.guard.tick(0.0)
 	var guard_player: AnimationPlayer = p.get_node("AnimationPlayer")
 	near(p.stamina, stamina_before_guard_raise, "Guard raise has no stamina cost")
-	check(not p.blocking and p.guard_phase == "raise", "Guard stays vulnerable during windup")
+	check(not p.guard.blocking and p.guard.phase == "raise", "Guard stays vulnerable during windup")
 	# A method key in the animation, not advance_guard(), activates blocking.
-	p.advance_guard(0.15)
-	check(not p.blocking, "Guard state is not driven by timer")
+	p.guard.tick(0.15)
+	check(not p.guard.blocking, "Guard state is not driven by timer")
 	guard_player.advance(0.15)
 	await process_frame
-	check(p.blocking and p.guard_phase == "hold", "Raise animation event activates guard")
-	near(p.perfect_guard_left, game.balance.perfect_guard_window, "Guard starts perfect-block window")
-	p.guard_requested = false
-	p.advance_guard(0.0)
-	check(not p.blocking and p.guard_phase == "lower", "Guard lowering loses protection")
+	check(p.guard.blocking and p.guard.phase == "hold", "Raise animation event activates guard")
+	near(p.guard.perfect_left, game.balance.perfect_guard_window, "Guard starts perfect-block window")
+	p.guard.requested = false
+	p.guard.tick(0.0)
+	check(not p.guard.blocking and p.guard.phase == "lower", "Guard lowering loses protection")
 	guard_player.advance(0.23)
 	await process_frame
-	check(p.guard_phase == "idle", "Lower animation event restores idle state")
+	check(p.guard.phase == "idle", "Lower animation event restores idle state")
 	var default_windup = game.balance.guard_windup
 	var default_recovery = game.balance.guard_recovery
 	game.balance.guard_windup = 0.30
 	game.balance.guard_recovery = 0.40
-	p.guard_requested = true
-	p.advance_guard(0.0)
+	p.guard.requested = true
+	p.guard.tick(0.0)
 	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_raise").length / 0.30, "Custom windup scales animation speed")
 	guard_player.advance(0.29)
 	await process_frame
-	check(not p.blocking, "Custom windup keeps guard vulnerable")
+	check(not p.guard.blocking, "Custom windup keeps guard vulnerable")
 	guard_player.advance(0.02)
 	await process_frame
-	check(p.blocking, "Custom windup animation event enables guard")
-	p.guard_requested = false
-	p.advance_guard(0.0)
+	check(p.guard.blocking, "Custom windup animation event enables guard")
+	p.guard.requested = false
+	p.guard.tick(0.0)
 	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_lower").length / 0.40, "Custom recovery scales animation speed")
 	guard_player.advance(0.39)
 	await process_frame
-	check(p.guard_phase == "lower", "Custom recovery keeps action lock")
+	check(p.guard.phase == "lower", "Custom recovery keeps action lock")
 	guard_player.advance(0.02)
 	await process_frame
-	check(p.guard_phase == "idle", "Custom recovery ends via animation event")
+	check(p.guard.phase == "idle", "Custom recovery ends via animation event")
 	game.balance.guard_windup = default_windup
 	game.balance.guard_recovery = default_recovery
 	p.evolutions.clear()
@@ -115,29 +126,29 @@ func run() -> void:
 	p.reset_groggy()
 	p.hp = p.max_hp
 	p.invuln = 0
-	p.blocking = false
+	p.guard.blocking = false
 	enemy.reset_groggy()
 	enemy.stamina = enemy.max_stamina
 	game.deal_damage(p, 1, enemy)
 	near(p.groggy, 6, "Normal hit adds six groggy")
 	p.update_groggy(0.5)
 	near(p.groggy, 5, "Groggy decays continuously without delay")
-	p.guard_phase = "hold"
-	p.blocking = true
-	p.perfect_guard_left = 0
+	p.guard.phase = "hold"
+	p.guard.blocking = true
+	p.guard.perfect_left = 0
 	var defender_groggy_before = p.groggy
 	var attacker_stamina_before = enemy.stamina
 	game.deal_damage(p, 1, enemy)
 	near(p.groggy, defender_groggy_before, "Regular guard does not gain groggy")
 	near(enemy.stamina, attacker_stamina_before - 15, "Blocked attack costs attacker 1.5x attack stamina extra")
-	p.perfect_guard_left = 0.10
+	p.guard.perfect_left = 0.10
 	game.deal_damage(p, 1, enemy)
 	near(enemy.groggy, 60, "Perfect guard adds 60 groggy to attacker")
-	near(p.perfect_guard_left, 0, "Perfect guard can trigger once per raise")
+	near(p.guard.perfect_left, 0, "Perfect guard can trigger once per raise")
 	game.deal_damage(p, 1, enemy)
 	near(enemy.groggy, 60, "Repeated hit in same hold does not duplicate parry")
-	p.guard_phase = "idle"
-	p.blocking = false
+	p.guard.phase = "idle"
+	p.guard.blocking = false
 	p.invuln = 1
 	game.deal_damage(p, 1, enemy)
 	near(p.groggy, defender_groggy_before, "Invulnerable hit adds no groggy")
@@ -173,7 +184,7 @@ func run() -> void:
 	near(p.groggy, 22, "Groggy always decays two per second")
 	p.reset_groggy()
 	p.combat_left = 0
-	p.blocking = false
+	p.guard.blocking = false
 	game.deal_damage(p, 1, game.monsters[0])
 	near(p.combat_left, 0, "Monster damage does not activate knight combat")
 	near(p.groggy, 6, "Monster hit uses normal groggy gain")
@@ -198,10 +209,10 @@ func run() -> void:
 	near(p.get_node("Visual/WeaponPivot1/WeaponPivot2").rotation, 0, "Exhaustion resets weapon wrist")
 	near(p.exhaustion_left, 1, "Exhaustion lasts one second")
 	check(not p.can_act(), "Exhausted fighter cannot act")
-	var exhausted_guard_phase = p.guard_phase
-	p.guard_requested = true
-	p.advance_guard(0.1)
-	check(p.guard_phase == exhausted_guard_phase, "Exhaustion prevents guarding")
+	var exhausted_guard_phase = p.guard.phase
+	p.guard.requested = true
+	p.guard.tick(0.1)
+	check(p.guard.phase == exhausted_guard_phase, "Exhaustion prevents guarding")
 	p.tick(0.5)
 	near(p.stamina, 0, "Stamina stays empty during exhaustion")
 	check(not p.can_act(), "Exhaustion still active after half second")

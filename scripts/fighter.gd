@@ -34,15 +34,13 @@ var boss_flag: bool = false
 var boss_damage: float = 0
 var boss_kills: int = 0
 var invuln: float = 0
-var blocking: bool = false
+var blocking: bool:
+	get: return guard != null and guard.blocking
 var stamina: float = 100.0
 var max_stamina: float = 100.0
 var exhaustion_left: float = 0.0
 var damage_contributors: Dictionary = {} # attacker instance ID -> most recent hit time
-var guard_requested: bool = false
-var guard_phase: String = "idle" # idle, raise, hold, lower
-var guard_time: float = 0.0
-var perfect_guard_left: float = 0.0
+@onready var guard = get_node_or_null("Guard")
 var attack_lock: float = 0.0
 var combat_left: float = 0
 var no_hit_time: float = 99
@@ -71,7 +69,7 @@ func _ready() -> void:
 	max_stamina = arena.balance.stamina_max
 	stamina = max_stamina
 	attack_target_limit = definition.attack_target_limit
-	var library = $AnimationPlayer.get_animation_library("").duplicate()
+	var library = $AnimationPlayer.get_animation_library("").duplicate(true)
 	$AnimationPlayer.remove_animation_library("")
 	$AnimationPlayer.add_animation_library("", library)
 	if definition.attack_animation != null: library.add_animation("swing", definition.attack_animation)
@@ -100,15 +98,15 @@ func tick(dt: float) -> void:
 	update_groggy(dt)
 	combat_left = maxf(0, combat_left - dt)
 	no_hit_time += dt
-	guard_requested = false
+	if guard != null: guard.requested = false
 	velocity = Vector2.ZERO
 	if can_act():
 		if is_player:
 			player_control()
 		else:
 			ai_control(dt)
-	advance_guard(dt)
-	if guard_phase == "idle" and attack_lock <= 0 and exhaustion_left <= 0.0:
+	if guard != null: guard.tick(dt)
+	if not guard_busy() and attack_lock <= 0 and exhaustion_left <= 0.0:
 		stamina = minf(max_stamina, stamina + arena.balance.stamina_regen * dt)
 	if dash_left > 0 and can_act():
 		dash_left -= dt
@@ -130,9 +128,9 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
-	guard_requested = can_guard() and (Input.is_action_pressed("block") or arena.touch_block)
+	if guard != null: guard.requested = Input.is_action_pressed("block") or arena.touch_block
 	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
-	if guard_phase != "idle" or guard_requested: multiplier *= 0.5
+	if guard_busy(): multiplier *= 0.5
 	elif attack_lock > 0: multiplier *= 0.75
 	velocity = move * speed * multiplier
 	if (not arena.touch_mode and Input.is_action_pressed("attack")) or arena.touch_attack: attack()
@@ -153,9 +151,9 @@ func ai_control(dt: float) -> void:
 	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
 	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
 	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	guard_requested = can_guard() and ai_block > 0
+	if guard != null: guard.requested = ai_block > 0
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
-	velocity = (offset.normalized() * toward + side) * speed * (0.5 if guard_phase != "idle" or guard_requested else 1.0)
+	velocity = (offset.normalized() * toward + side) * speed * (0.5 if guard_busy() else 1.0)
 	if distance < 92: attack()
 	if distance < 430 and randf() < dt * 0.5: skill("e")
 	if distance < 220 and randf() < dt * 0.3: skill("r")
@@ -166,8 +164,7 @@ func can_act() -> bool:
 	return alive and groggy_left <= 0 and exhaustion_left <= 0.0
 
 func can_guard() -> bool:
-	# The starting stick fighter only attacks; guarding unlocks after evolving.
-	return not evolutions.is_empty()
+	return guard != null
 
 func trigger_exhaustion() -> void:
 	if exhaustion_left > 0.0 or not alive: return
@@ -195,71 +192,16 @@ func spend_stamina(cost: float) -> bool:
 		return false
 	return true
 
-func advance_guard(dt: float) -> void:
-	if not can_act():
-		guard_requested = false
-		return
-	perfect_guard_left = maxf(0.0, perfect_guard_left - dt)
-	if guard_phase == "idle" and guard_requested and can_guard() and attack_lock <= 0 and dash_left <= 0:
-		guard_phase = "raise"
-		play_guard_animation("guard_raise", arena.balance.guard_windup)
-	elif guard_phase == "hold":
-		if not guard_requested:
-			lower_guard()
-		else:
-			stamina = maxf(0.0, stamina - arena.balance.guard_drain_per_second * dt)
-			if stamina <= 0.0: trigger_exhaustion()
-
-func play_guard_animation(animation_name: String, duration: float) -> void:
-	# The animation method track, not this timer, commits guard state changes.
-	guard_time = maxf(0.01, duration)
-	var animation: Animation = $AnimationPlayer.get_animation(animation_name)
-	$AnimationPlayer.play(animation_name, 0.0, animation.length / guard_time)
-	$AnimationPlayer.advance(0.0)
-
-# Invoked by the guard_raise AnimationPlayer method track.
-func on_guard_raised() -> void:
-	if guard_phase != "raise": return
-	guard_phase = "hold"
-	blocking = true
-	perfect_guard_left = arena.balance.perfect_guard_window
-	if not guard_requested: lower_guard()
-
-# Invoked by the guard_lower AnimationPlayer method track.
-func on_guard_lowered() -> void:
-	if guard_phase != "lower": return
-	guard_phase = "idle"
-	blocking = false
-	perfect_guard_left = 0.0
-
-func lower_guard() -> void:
-	if guard_phase != "hold" and guard_phase != "raise": return
-	guard_phase = "lower"
-	blocking = false
-	perfect_guard_left = 0.0
-	play_guard_animation("guard_lower", arena.balance.guard_recovery)
+func guard_busy() -> bool:
+	return guard != null and guard.is_busy()
 
 func reset_guard() -> void:
-	guard_phase = "idle"
-	guard_time = 0
-	guard_requested = false
-	blocking = false
-	perfect_guard_left = 0.0
-	attack_lock = 0
+	if guard != null: guard.reset()
+	attack_lock = 0.0
 	$AnimationPlayer.stop()
 
-func absorb_guard_hit() -> bool:
-	if not blocking or guard_phase != "hold": return false
-	if not spend_stamina(arena.balance.guard_hit_cost):
-		if exhaustion_left <= 0.0: lower_guard()
-		return false
-	return true
-
-func is_perfect_guard() -> bool:
-	return blocking and guard_phase == "hold" and perfect_guard_left > 0.0
-
 func attack() -> void:
-	if not can_act() or blocking or guard_requested or guard_phase != "idle" or attack_lock > 0 or cooldown.attack > 0: return
+	if not can_act() or guard_busy() or attack_lock > 0 or cooldown.attack > 0: return
 	if not spend_stamina(arena.balance.attack_stamina_cost): return
 	var swing: Animation = $AnimationPlayer.get_animation("swing")
 	attack_lock = swing.length / attack_speed
@@ -283,7 +225,7 @@ func resolve_attack_hit() -> void:
 	arena.add_xp(self, 0.35)
 
 func dash(direction: Vector2 = Vector2.ZERO) -> void:
-	if not can_act() or cooldown.dash > 0 or attack_lock > 0 or guard_phase != "idle" or guard_requested: return
+	if not can_act() or cooldown.dash > 0 or attack_lock > 0 or guard_busy(): return
 	if not spend_stamina(arena.balance.dash_stamina_cost): return
 	if direction.length() < 0.1: direction = Vector2.from_angle(facing)
 	dash_left = 0.17
@@ -309,7 +251,7 @@ func equip_ability(slot: String, ability: CrownAbility) -> void:
 	animator.add_animation_library("", library)
 
 func skill(key: String) -> void:
-	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0 or attack_lock > 0 or guard_phase != "idle" or guard_requested: return
+	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0 or attack_lock > 0 or guard_busy(): return
 	var ability: CrownAbility = abilities[key]
 	cooldown[key] = ability.cooldown
 	pending_skills[key] = ability
@@ -376,6 +318,7 @@ func update_visual() -> void:
 	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else Color.WHITE)
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
+	if guard != null: guard.update_visual()
 	queue_redraw()
 
 func _draw() -> void:
@@ -383,7 +326,5 @@ func _draw() -> void:
 	draw_circle(Vector2(0, 18), 29 * body_scale, Color(0, 0, 0, 0.25))
 	if evolutions.size() > 0:
 		draw_arc(Vector2.ZERO, 32 * body_scale, 0, TAU, 32, tint, evolutions.size() + 1)
-	if blocking:
-		draw_arc(Vector2.ZERO, 42 * body_scale, facing - 0.8, facing + 0.8, 16, Color("88d7f7"), 4)
 	if groggy_left > 0:
 		draw_arc(Vector2(0, -75), 10, 0, TAU * groggy_left / arena.balance.groggy_duration, 16, Color("ffc664"), 3)
