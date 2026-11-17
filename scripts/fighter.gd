@@ -179,9 +179,13 @@ func trigger_exhaustion() -> void:
 	pending_skills.clear()
 	$AnimationPlayer.stop()
 	$Visual.position = Vector2.ZERO
-	$Visual/WeaponPivot.rotation = 0.0
+	reset_weapon_pose()
 	for animator in ability_players.values(): animator.stop()
 	arena.float_text(position, "탈진!", Color("ff9f70"))
+
+func reset_weapon_pose() -> void:
+	$Visual/WeaponPivot1.rotation = 0.0
+	$Visual/WeaponPivot1/WeaponPivot2.rotation = 0.0
 
 func spend_stamina(cost: float) -> bool:
 	if not can_act() or stamina < cost: return false
@@ -243,7 +247,6 @@ func reset_guard() -> void:
 	perfect_guard_left = 0.0
 	attack_lock = 0
 	$AnimationPlayer.stop()
-	$Visual/Shield.position = Vector2(12, 25)
 
 func absorb_guard_hit() -> bool:
 	if not blocking or guard_phase != "hold": return false
@@ -334,7 +337,7 @@ func add_groggy(amount: float) -> void:
 	pending_skills.clear()
 	$AnimationPlayer.stop()
 	$Visual.position = Vector2.ZERO
-	$Visual/WeaponPivot.rotation = 0
+	reset_weapon_pose()
 	for animator in ability_players.values(): animator.stop()
 	arena.float_text(position, "그로기!", Color("ffcf63"))
 
@@ -370,8 +373,6 @@ func update_visual() -> void:
 	# Source sprite faces upward (-PI/2); align it with combat facing.
 	$Visual.rotation = facing + PI / 2.0
 	$Visual.scale = Vector2.ONE * body_scale
-	$Visual/Shield.visible = can_guard()
-	$Visual/Shield.modulate = Color("bfefff") if blocking else (Color("aebccc") if guard_phase == "raise" else Color("6d798b"))
 	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else Color.WHITE)
 	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100

@@ -30,8 +30,8 @@ func run() -> void:
 	near(p.stamina, 100, "Starting stamina")
 	check(p.facing == -PI / 2.0, "Stick fighter defaults to facing upward")
 	check(p.get_node("Visual/Body").texture.resource_path == "res://assets/Character_Base.png", "Base body uses supplied PNG")
-	check(p.get_node("Visual/WeaponPivot/Sword").texture.resource_path == "res://assets/Stick.png", "Starter weapon uses supplied stick")
-	check(not p.can_guard() and not p.get_node("Visual/Shield").visible, "Starter cannot guard and has no shield")
+	check(p.get_node("Visual/WeaponPivot1/WeaponPivot2/Sword").texture.resource_path == "res://assets/Stick.png", "Starter weapon uses supplied stick")
+	check(not p.can_guard() and not p.has_node("Visual/Shield"), "Starter cannot guard and has no shield")
 	near(p.max_stamina, 100, "Maximum stamina stays constant at spawn")
 	check(p.get_node("AnimationPlayer").has_animation("guard_raise"), "Guard raise animation available")
 	check(p.get_node("AnimationPlayer").has_animation("guard_lower"), "Guard recovery animation available")
@@ -143,12 +143,16 @@ func run() -> void:
 	near(p.groggy, defender_groggy_before, "Invulnerable hit adds no groggy")
 	p.invuln = 0
 	p.reset_groggy()
+	p.get_node("Visual/WeaponPivot1").rotation = 1.2
+	p.get_node("Visual/WeaponPivot1/WeaponPivot2").rotation = -0.7
 	# Approximately twenty normal hits at half-second intervals should cause groggy.
 	for i in 20:
 		p.add_groggy(game.balance.groggy_hit)
 		if i < 19: p.update_groggy(0.5)
 	near(p.groggy_left, 2, "About twenty sustained hits trigger two-second groggy")
 	check(not p.can_act(), "Groggy disables actions")
+	near(p.get_node("Visual/WeaponPivot1").rotation, 0, "Groggy resets weapon shoulder")
+	near(p.get_node("Visual/WeaponPivot1/WeaponPivot2").rotation, 0, "Groggy resets weapon wrist")
 	p.add_groggy(100)
 	near(p.groggy_left, 2, "Hits cannot extend active groggy")
 	game.touch_move = Vector2.RIGHT
@@ -185,9 +189,13 @@ func run() -> void:
 	near(p.groggy, 0, "Knight kill clears groggy meter")
 	near(p.groggy_left + p.combat_left, 0, "Knight kill clears groggy and combat")
 	# Exhaustion: an exact zero expenditure causes a one-second action lock.
+	p.get_node("Visual/WeaponPivot1").rotation = 1.2
+	p.get_node("Visual/WeaponPivot1/WeaponPivot2").rotation = -0.7
 	p.stamina = 10
 	check(not p.spend_stamina(10), "Exact stamina depletion interrupts action")
 	near(p.stamina, 0, "Exhaustion starts at zero stamina")
+	near(p.get_node("Visual/WeaponPivot1").rotation, 0, "Exhaustion resets weapon shoulder")
+	near(p.get_node("Visual/WeaponPivot1/WeaponPivot2").rotation, 0, "Exhaustion resets weapon wrist")
 	near(p.exhaustion_left, 1, "Exhaustion lasts one second")
 	check(not p.can_act(), "Exhausted fighter cannot act")
 	var exhausted_guard_phase = p.guard_phase
