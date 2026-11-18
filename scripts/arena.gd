@@ -135,7 +135,7 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 		"groggy", "groggy_decay_left", "groggy_immunity", "dash_left",
 		"dash_velocity", "facing", "evolutions", "class_name_text",
 		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_block",
-		"respawn_timer", "attack_lock", "attack_range_override",
+		"respawn_timer", "attack_lock", "swing_power", "attack_range_override",
 		"attack_arc_override_degrees", "show_attack_range"
 	]
 	for key in state_keys:
@@ -263,16 +263,21 @@ func deal_damage(target, amount: float, source) -> float:
 	if duel:
 		target.combat_left = balance.combat_duration
 		source.combat_left = balance.combat_duration
-		# Last successful hit by each distinct attacker, within the combat window.
-		target.damage_contributors[source.get_instance_id()] = elapsed
 	var shield_reduction = -1.0
 	if target is CrownFighter and target.guard != null:
-		shield_reduction = target.guard.receive_hit(source)
+		shield_reduction = target.guard.receive_hit(source, amount)
 	var was_blocking = shield_reduction >= 0.0
+	# Barrier guard negates a hit completely: no HP, groggy, lifesteal or XP.
+	if shield_reduction >= 1.0:
+		float_text(target.position, "방어!", Color("80cffa"))
+		return 0.0
 	var reduction = target.armor / (100.0 + target.armor)
 	if was_blocking:
 		reduction = 1 - (1 - reduction) * (1 - shield_reduction)
 	var final = maxf(1, amount * (1 - reduction))
+	if duel:
+		# A fully absorbed shield hit is not a damage contribution.
+		target.damage_contributors[source.get_instance_id()] = elapsed
 	target.hp -= final
 	if target is CrownFighter and target.hp > 0 and not was_blocking:
 		target.add_groggy(balance.groggy_hit)
