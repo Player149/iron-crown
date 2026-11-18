@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://ym6ggymtw685" path="res://scripts/characters/spearman.gd" id="2"]
 [ext_resource type="Resource" path="res://data/characters/templates/spearman.tres" id="3"]
 [ext_resource type="Texture2D" uid="uid://cm3qhp688h417" path="res://assets/Spear.png" id="4"]
+[ext_resource type="Script" path="res://scripts/components/shield_guard.gd" id="5"]
 
 [sub_resource type="Animation" id="Reset"]
 length = 0.001
@@ -75,11 +76,35 @@ tracks/2/keys = {
 "values": [0.0, -0.6981317007977318, 0.7347836150896131, 0.0]
 }
 
+[sub_resource type="Animation" id="GuardRaise"]
+resource_name = "guard_raise"
+length = 0.10
+tracks/0/type = "method"
+tracks/0/path = NodePath("Guard")
+tracks/0/keys = {
+"times": PackedFloat32Array(0.099),
+"transitions": PackedFloat32Array(1),
+"values": [{"args": [], "method": &"on_guard_raised"}]
+}
+
+[sub_resource type="Animation" id="GuardLower"]
+resource_name = "guard_lower"
+length = 0.16
+tracks/0/type = "method"
+tracks/0/path = NodePath("Guard")
+tracks/0/keys = {
+"times": PackedFloat32Array(0.159),
+"transitions": PackedFloat32Array(1),
+"values": [{"args": [], "method": &"on_guard_lowered"}]
+}
+
 [sub_resource type="AnimationLibrary" id="Anims"]
 resource_local_to_scene = true
 _data = {
 &"RESET": SubResource("Reset"),
-&"swing": SubResource("Swing")
+&"swing": SubResource("Swing"),
+&"guard_raise": SubResource("GuardRaise"),
+&"guard_lower": SubResource("GuardLower")
 }
 
 [node name="Spearman" unique_id=1437213972 instance=ExtResource("1")]
@@ -95,3 +120,8 @@ texture = ExtResource("4")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." index="5" unique_id=961879843]
 libraries/ = SubResource("Anims")
+
+[node name="Guard" type="Node2D" parent="."]
+script = ExtResource("5")
+mode = "simple"
+shield_path = NodePath("../Visual/Body")
