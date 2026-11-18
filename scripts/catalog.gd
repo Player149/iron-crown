@@ -56,9 +56,12 @@ static func apply_stat(f, id: String) -> void:
 		"dash": f.dash_mult *= 0.86
 
 static func evolve(f, choice: Array) -> void:
+	if f == null or not is_instance_valid(f): return
 	var d = ROSTER.find(choice[0])
 	if d == null or f.evolutions.has(d.id): return
 	if not options_for(f, d.unlock_level).any(func(row): return row[0] == d.id): return
+	if d.evolution_scene != null:
+		f = f.arena.replace_fighter_scene(f, d)
 	f.evolutions.append(d.id)
 	f.class_name_text = d.title
 	var old_hp = f.max_hp
