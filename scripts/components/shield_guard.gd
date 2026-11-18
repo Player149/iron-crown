@@ -4,6 +4,11 @@ extends Node2D
 @export var raise_animation: StringName = &"guard_raise"
 @export var lower_animation: StringName = &"guard_lower"
 @export var shield_path: NodePath = ^"../Visual/Shield"
+@export_enum("timed", "simple", "barrier") var mode: String = "timed"
+## Barrier-only pool; a full hit is absorbed if the pool had any durability.
+@export var meter_max: float = 100.0
+@export var meter_regen: float = 12.0
+var meter: float = 100.0
 var requested: bool = false
 var phase: String = "idle"
 var blocking: bool = false
@@ -16,6 +21,7 @@ var using_fallback: bool = false
 var rest_position: Vector2
 
 func _ready() -> void:
+	meter = meter_max
 	if shield != null: rest_position = shield.position
 	animator.animation_finished.connect(_on_animation_finished)
 
@@ -27,18 +33,20 @@ func tick(dt: float) -> void:
 		reset()
 		return
 	perfect_left = maxf(0.0, perfect_left - dt)
+	if mode == "barrier" and phase == "idle":
+		meter = minf(meter_max, meter + meter_regen * dt)
 	if using_fallback:
 		fallback_left = maxf(0.0, fallback_left - dt)
 		if fallback_left <= 0.0:
 			if phase == "raise": on_guard_raised()
 			elif phase == "lower": on_guard_lowered()
-	if phase == "idle" and requested and fighter.attack_lock <= 0 and fighter.dash_left <= 0:
+	if phase == "idle" and requested and (mode != "barrier" or meter > 0.0) and fighter.attack_lock <= 0 and fighter.dash_left <= 0:
 		phase = "raise"
 		play_transition(raise_animation, fighter.arena.balance.guard_windup)
 	elif phase == "hold":
 		if not requested:
 			lower()
-		else:
+		elif mode != "barrier":
 			fighter.stamina = maxf(0.0, fighter.stamina - fighter.arena.balance.guard_drain_per_second * dt)
 			if fighter.stamina <= 0.0: fighter.trigger_exhaustion()
 	update_visual()
@@ -92,18 +100,24 @@ func reset() -> void:
 
 func absorb_hit() -> bool:
 	if not fighter.can_act() or not blocking or phase != "hold": return false
+	if mode == "barrier": return meter > 0.0
 	if not fighter.spend_stamina(fighter.arena.balance.guard_hit_cost):
 		if fighter.exhaustion_left <= 0.0: lower()
 		return false
 	return true
 
 ## Returns -1 for an unblocked hit, otherwise the shield damage reduction.
-func receive_hit(source) -> float:
-	var perfect = blocking and phase == "hold" and perfect_left > 0.0
+func receive_hit(source, incoming_damage: float = 0.0) -> float:
+	var perfect = mode == "timed" and blocking and phase == "hold" and perfect_left > 0.0
 	if not absorb_hit(): return -1.0
 	var arena = fighter.arena
 	arena.fx_ring(fighter.position, 45, Color("91dfff"), 0.2)
-	if source is CrownFighter:
+	if mode == "barrier":
+		meter = maxf(0.0, meter - maxf(0.0, incoming_damage))
+		if meter <= 0.0: lower()
+		update_visual()
+		return 1.0
+	if mode == "timed" and source is CrownFighter:
 		source.stamina = maxf(0.0, source.stamina - arena.balance.attack_stamina_cost * arena.balance.blocked_attack_stamina_multiplier)
 		if source.stamina <= 0.0: source.trigger_exhaustion()
 		if perfect:
@@ -120,3 +134,5 @@ func update_visual() -> void:
 func _draw() -> void:
 	if not is_instance_valid(fighter) or not fighter.alive or not blocking: return
 	draw_arc(Vector2.ZERO, 42 * fighter.body_scale, fighter.facing - 0.8, fighter.facing + 0.8, 16, Color("88d7f7"), 4)
+	if mode == "barrier":
+		draw_arc(Vector2(0, -50), 16, PI, PI + PI * meter / maxf(1.0, meter_max), 16, Color("8be9e1"), 3)
