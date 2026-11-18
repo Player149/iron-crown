@@ -20,6 +20,7 @@ func skill(key: String) -> void:
 		return
 	if not arena.active() or not can_act() or guard_busy() or attack_lock > 0.0 or cooldown.e > 0.0: return
 	cooldown.e = USELESS_COOLDOWN
+	damage *= 1.25
 	useless_left = USELESS_DURATION
 	arena.float_text(position, "쓸모없음 +25%!", Color("e0beff"))
 	arena.fx_ring(position, 50, Color("bda0ed"), 0.35)
