@@ -10,7 +10,9 @@ func _ready() -> void:
 
 func tick(dt: float) -> void:
 	super.tick(dt)
-	useless_left = maxf(0.0, useless_left - dt)
+	if useless_left > 0.0:
+		useless_left = maxf(0.0, useless_left - dt)
+		if useless_left <= 0.0: damage /= 1.25
 
 func skill(key: String) -> void:
 	if key != "e":
