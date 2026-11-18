@@ -155,8 +155,16 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 		if entry.fighter == old_f: entry.fighter = replacement
 	for actor in fighters:
 		if actor.ai_target == old_f: actor.ai_target = replacement
+		# Preserve recent kill-contribution records across a change of actor node.
+		if actor.damage_contributors.has(old_f.get_instance_id()):
+			var last_hit = actor.damage_contributors[old_f.get_instance_id()]
+			actor.damage_contributors.erase(old_f.get_instance_id())
+			actor.damage_contributors[replacement.get_instance_id()] = last_hit
 	for projectile in $Projectiles.get_children():
 		if projectile.source == old_f: projectile.source = replacement
+	for meta_name in old_f.get_meta_list():
+		replacement.set_meta(meta_name, old_f.get_meta(meta_name))
+	old_f.set_meta("evolution_replacement", replacement)
 	old_f.hide()
 	old_f.queue_free()
 	replacement.update_visual()
@@ -305,6 +313,9 @@ func kill_target(target, killer) -> void:
 		var contributor_count = recent_contributor_count(target)
 		killer.kills += 1
 		add_xp(killer, 110 + target.level * 25)
+		# XP can evolve an AI on the killing hit; reward its replacement.
+		if killer.has_meta("evolution_replacement"):
+			killer = killer.get_meta("evolution_replacement")
 		if contributor_count == 1:
 			killer.hp = killer.max_hp
 		else:
