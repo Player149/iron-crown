@@ -1,9 +1,11 @@
-[gd_resource type="Resource" load_steps=2 format=3]
-
+[gd_resource type="Resource" load_steps=3 format=3]
 [ext_resource type="Script" path="res://scripts/character_definition.gd" id="1"]
-
+[ext_resource type="PackedScene" path="res://scenes/characters/hammerman.tscn" id="2"]
 [resource]
 script = ExtResource("1")
 id = "hammerman"
 title = "망치병"
-description = "망치병 제작용 기본 틀"
+description = "느린 회전 강타 · 망치 전용 공격 모션"
+unlock_level = 5
+parent_ids = PackedStringArray("knight")
+evolution_scene = ExtResource("2")
