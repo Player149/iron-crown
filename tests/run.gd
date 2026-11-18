@@ -292,6 +292,74 @@ func run() -> void:
 	var ai_evolved = CrownCatalog.evolve(ai_starter, new_choices[0])
 	check(not ai_evolved.is_player and game.fighters[ai_index] == ai_evolved, "AI evolution updates fighter roster")
 
+	# Class-specific combat regression checks, independent of evolution selection UI.
+	for spec in [
+		["swordsman", "검사"],
+		["spearman", "창병"],
+		["hammerman", "망치병"],
+		["shieldbearer", "방패병"]
+	]:
+		game.start_game()
+		var actor = game.player
+		actor.level = 5
+		var picked = CrownCatalog.EVOLUTIONS[5].filter(func(c): return c[0] == spec[0])[0]
+		actor = CrownCatalog.evolve(actor, picked)
+		actor.stamina = actor.max_stamina
+		actor.invuln = 0
+		var victim = game.fighters[1]
+		victim.position = actor.position + Vector2(40, 0)
+		victim.invuln = 0
+		if spec[0] == "swordsman":
+			actor.cooldown.attack = 2.0
+			actor.cooldown.e = 0
+			actor.skill("e")
+			near(actor.swing_power, 1.25, "Sword E swing deals 125%")
+			near(actor.cooldown.attack, 2.0, "Sword E does not change normal attack cooldown")
+			check(actor.cooldown.e > 0.0, "Sword E has separate skill cooldown")
+			check(actor.guard != null and actor.guard.mode == "timed", "Sword retains original timed guard")
+		elif spec[0] == "spearman":
+			check(actor.attack_reach() >= 130.0, "Spear receives longer attack reach")
+			check(actor.guard != null and actor.guard.mode == "simple", "Spear uses damage-reduction-only guard")
+			actor.guard.phase = "hold"
+			actor.guard.blocking = true
+			var stamina_before_guard_hit = victim.stamina
+			var hp_before_simple_guard = actor.hp
+			game.deal_damage(actor, 20.0, victim)
+			check(actor.hp < hp_before_simple_guard, "Simple spear guard reduces damage, not negates it")
+			near(victim.stamina, stamina_before_guard_hit, "Spear guard does not punish attacking stamina")
+			actor.guard.reset()
+			actor.skill("e")
+			check(actor.cooldown.e > 0.0 and actor.lunge_left > 0.0, "Spear E begins short damaging lunge")
+			near(actor.dash_velocity.length(), 650.0, "Spear E lunge speed")
+		elif spec[0] == "hammerman":
+			actor.attack()
+			check(actor.charging, "Hammer attack begins charge")
+			actor.charge_time = 3.0
+			actor.release_charge()
+			near(actor.swing_power, 2.5, "Full hammer charge deals 250%")
+			actor.attack_lock = 0.0
+			actor.cooldown.e = 0.0
+			actor.hp = 40.0
+			actor.skill("e")
+			near(actor.hp, 40.0 + actor.max_hp * 0.25, "Ironman restores 25% of max health")
+		elif spec[0] == "shieldbearer":
+			check(actor.guard != null and actor.guard.mode == "barrier", "Shield uses durability barrier guard")
+			actor.guard.phase = "hold"
+			actor.guard.blocking = true
+			actor.stamina = 50.0
+			var barrier_stamina = actor.stamina
+			var barrier_hp = actor.hp
+			game.deal_damage(actor, 30.0, victim)
+			near(actor.hp, barrier_hp, "Barrier negates incoming damage")
+			near(actor.stamina, barrier_stamina, "Barrier consumes no stamina when hit")
+			near(actor.guard.meter, 70.0, "Barrier meter loses incoming damage")
+			actor.guard.reset()
+			actor.skill("e")
+			near(actor.useless_left, 6.0, "Useless buff activates")
+			actor.attack_lock = 0.0
+			actor.cooldown.attack = 0.0
+			actor.attack()
+			near(actor.swing_power, 1.25, "Useless raises attack power by 25%")
 	game.start_game()
 	p = game.player
 	game.add_xp(p, 1000000)
