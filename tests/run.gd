@@ -403,6 +403,30 @@ func run() -> void:
 	near(p.damage, damage_before, "Boss stats restored")
 	game.paused = false
 	game.boss_finish_pending = false
+	# Duel mode: only two equally leveled combatants, no XP or extra arena entities.
+	game.start_duel("spearman", "shieldbearer")
+	check(game.mode == "duel" and game.active(), "Duel becomes active")
+	check(game.fighters.size() == 2 and game.monsters.is_empty(), "Duel spawns exactly two fighters without monsters")
+	check(game.player != game.duel_enemy and not game.duel_enemy.is_player, "Duel assigns a human and an AI")
+	check(game.player.class_name_text == "창병" and game.duel_enemy.class_name_text == "방패병", "Duel picks the requested classes")
+	check(game.player.level == 5 and game.duel_enemy.level == 5, "Duel starts both at Lv5")
+	near(game.player.max_hp, game.duel_enemy.max_hp, "Duel players have equal maximum HP")
+	near(game.player.damage, game.duel_enemy.damage, "Duel players have equal base attack")
+	near(game.player.stamina, game.duel_enemy.stamina, "Duel players start with equal stamina")
+	check(game.get_node("Zones").visible == false, "Duel hides XP zones")
+	var duel_xp_before: float = game.player.xp
+	game.add_xp(game.player, 2500.0)
+	near(game.player.xp, duel_xp_before, "Duel disables XP growth")
+	var duel_kills_before: int = game.run_kills
+	game.kill_target(game.duel_enemy, game.player)
+	check(game.mode == "duel_result", "Duel ends as soon as opponent dies")
+	check(game.run_kills == duel_kills_before, "Duel grants no normal run kills or gold")
+	game.start_duel("hammerman", "swordsman")
+	check(game.mode == "duel" and game.player.class_name_text == "망치병" and game.duel_enemy.class_name_text == "검사", "Duel rematch supports new class pair")
+	game.return_menu()
+	check(game.mode == "menu", "Duel can return to the main menu")
+	game.start_game()
+	check(game.mode == "play" and game.monsters.size() == 28, "Standard arena remains available after duel")
 	game.mode = "menu"
 	game.queue_free()
 	await process_frame
