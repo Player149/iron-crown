@@ -110,6 +110,58 @@ func start_game(boost: bool = false) -> void:
 	ui.notice("전장 입장", "살아남아 왕관을 차지하세요")
 	process_choices()
 
+## Replace the actor node so evolution applies its authored weapon, animation,
+## collision setup and optional Guard component, not only its stats.
+## Keep player/AI references and accumulated combat state.
+func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
+	if definition.evolution_scene == null: return old_f
+	var replacement = definition.evolution_scene.instantiate()
+	replacement.arena = self
+	replacement.definition = definition
+	replacement.is_player = old_f.is_player
+	replacement.display_name = old_f.display_name
+	replacement.tint = old_f.tint
+	replacement.position = old_f.position
+	$Actors.add_child(replacement)
+	# Initialization in _ready() uses the new scene's correct animations and Guard.
+	# Restore run progress after the new actor's initial setup.
+	var state_keys = [
+		"position", "velocity", "level", "xp", "max_hp", "hp", "armor",
+		"damage", "speed", "attack_speed", "crit", "lifesteal", "skill_power",
+		"xp_gain", "gold_bonus", "dash_mult", "block_reduction", "body_scale",
+		"radius", "alive", "kills", "boss_flag", "boss_damage", "boss_kills",
+		"invuln", "stamina", "max_stamina", "exhaustion_left",
+		"damage_contributors", "combat_left", "no_hit_time", "groggy_left",
+		"groggy", "groggy_decay_left", "groggy_immunity", "dash_left",
+		"dash_velocity", "facing", "evolutions", "class_name_text",
+		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_block",
+		"respawn_timer", "attack_lock", "attack_range_override",
+		"attack_arc_override_degrees", "show_attack_range"
+	]
+	for key in state_keys:
+		var value = old_f.get(key)
+		replacement.set(key, value.duplicate(true) if value is Dictionary or value is Array else value)
+	# Retain previously unlocked skills when a later evolution changes the model.
+	for slot in old_f.abilities:
+		replacement.equip_ability(slot, old_f.abilities[slot])
+	# Future projectile, targeting and ranking queries must refer to the new node.
+	var index = fighters.find(old_f)
+	if index >= 0: fighters[index] = replacement
+	if player == old_f: player = replacement
+	if boss == old_f: boss = replacement
+	for i in participants.size():
+		if participants[i] == old_f: participants[i] = replacement
+	for entry in snapshots:
+		if entry.fighter == old_f: entry.fighter = replacement
+	for actor in fighters:
+		if actor.ai_target == old_f: actor.ai_target = replacement
+	for projectile in $Projectiles.get_children():
+		if projectile.source == old_f: projectile.source = replacement
+	old_f.hide()
+	old_f.queue_free()
+	replacement.update_visual()
+	return replacement
+
 func spawn_fighter(human: bool):
 	var f = FighterScene.instantiate()
 	f.arena = self
