@@ -27,6 +27,10 @@ var touch_block: bool = false
 var touch_run: bool = false
 var effects: Array = []
 var boss_finish_pending: bool = false
+var duel_enemy
+var duel_player_class: String = "swordsman"
+var duel_enemy_class: String = "hammerman"
+const DUEL_SIZE := Vector2(900, 540)
 var sounds: Dictionary = {}
 @onready var ui = $UI
 @onready var camera = $Camera2D
@@ -57,16 +61,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if active() and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
 		player.show_attack_range = not player.show_attack_range
 		player.queue_redraw()
-	if event.is_action_pressed("pause") and mode in ["play", "boss"] and not choice_open:
+	if event.is_action_pressed("pause") and mode in ["play", "boss", "duel"] and not choice_open:
 		paused = not paused
 		ui.show_pause(paused)
 	if active() and event.is_action_pressed("level_test") and mode == "play": add_xp(player, balance.xp_needed(player.level) - player.xp + 1)
 	if active() and event.is_action_pressed("boss_test"): start_boss(true)
 
 func active() -> bool:
-	return mode in ["play", "boss"] and not paused and not choice_open
+	return mode in ["play", "boss", "duel"] and not paused and not choice_open
 
 func start_game(boost: bool = false) -> void:
+	$Zones.show()
+	duel_enemy = null
 	for node in $Actors.get_children():
 		$Actors.remove_child(node)
 		node.queue_free()
@@ -180,11 +186,60 @@ func spawn_fighter(human: bool):
 	fighters.append(f)
 	return f
 
+## A self-contained, equal-level fight without XP, monsters, zones or boss events.
+func start_duel(player_class: String = "swordsman", enemy_class: String = "hammerman") -> void:
+	if CrownCatalog.ROSTER.find(player_class) == null or CrownCatalog.ROSTER.find(enemy_class) == null: return
+	duel_player_class = player_class
+	duel_enemy_class = enemy_class
+	for actor in $Actors.get_children():
+		$Actors.remove_child(actor)
+		actor.queue_free()
+	clear_projectiles()
+	fighters.clear()
+	monsters.clear()
+	choices.clear()
+	effects.clear()
+	mode = "duel"
+	paused = false
+	choice_open = false
+	elapsed = 0.0
+	run_kills = 0
+	boss = null
+	duel_enemy = null
+	$Zones.hide()
+	player = spawn_fighter(true)
+	duel_enemy = spawn_fighter(false)
+	# A player can own persistent runes; normalize before evolution for fair testing.
+	for key in duel_enemy.base_stats:
+		player.set(key, duel_enemy.base_stats[key])
+	player.base_stats = duel_enemy.base_stats.duplicate(true)
+	var center: Vector2 = balance.world_size / 2.0
+	player.position = center + Vector2(-180, 0)
+	duel_enemy.position = center + Vector2(180, 0)
+	player.facing = 0.0
+	duel_enemy.facing = PI
+	for fighter in fighters:
+		for i in 4: fighter.grow_level()
+		fighter.hp = fighter.max_hp
+		fighter.stamina = fighter.max_stamina
+		fighter.xp = 0.0
+		fighter.invuln = 0.0
+		fighter.cooldown = {"attack": 0.0, "dash": 0.0, "e": 0.0, "r": 0.0, "q": 0.0}
+	player = CrownCatalog.evolve(player, [player_class])
+	duel_enemy = CrownCatalog.evolve(duel_enemy, [enemy_class])
+	player.display_name = "플레이어"
+	duel_enemy.display_name = "AI 상대"
+	player.update_visual()
+	duel_enemy.update_visual()
+	camera.position = center
+	ui.show_game()
+	ui.notice("1대1 실전 테스트", "%s VS %s" % [player.class_name_text, duel_enemy.class_name_text])
+
 func random_position() -> Vector2:
 	return Vector2(randf_range(100, balance.world_size.x - 100), randf_range(100, balance.world_size.y - 100))
 
 func bounds() -> Rect2:
-	return Rect2(500, 250, 2200, 1700) if mode == "boss" else Rect2(Vector2.ZERO, balance.world_size)
+	return Rect2(balance.world_size / 2.0 - DUEL_SIZE / 2.0, DUEL_SIZE) if mode == "duel" else (Rect2(500, 250, 2200, 1700) if mode == "boss" else Rect2(Vector2.ZERO, balance.world_size))
 
 func _physics_process(dt: float) -> void:
 	if active():
@@ -192,7 +247,7 @@ func _physics_process(dt: float) -> void:
 		if mode == "play":
 			boss_countdown -= dt
 			if boss_countdown <= 0: start_boss()
-		else:
+		elif mode == "boss":
 			boss_timer -= dt
 			if boss_timer <= 0: finish_boss(false)
 		if not active(): return
@@ -221,7 +276,7 @@ func _physics_process(dt: float) -> void:
 	effects = effects.filter(func(fx): return fx.life > 0)
 	if is_instance_valid(player):
 		var focus = player if player.alive or boss == null else boss
-		camera.position = camera.position.lerp(focus.position, 1 - exp(-8 * dt))
+		camera.position = camera.position.lerp(balance.world_size / 2.0 if mode == "duel" else focus.position, 1 - exp(-8 * dt))
 	ui.update_hud()
 	queue_redraw()
 
@@ -306,6 +361,11 @@ func kill_target(target, killer) -> void:
 	if not target is CrownFighter:
 		target.respawn_timer = randf_range(8, 14)
 		if killer is CrownFighter: add_xp(killer, 48 if target.brute else 28)
+		return
+	if mode == "duel":
+		mode = "duel_result"
+		paused = true
+		ui.show_duel_result(target != player, player.class_name_text, duel_enemy.class_name_text, elapsed)
 		return
 	if mode == "boss":
 		if target == boss: boss_finish_pending = true
@@ -487,7 +547,9 @@ func revive() -> void:
 	process_choices()
 
 func return_menu() -> void:
-	bank_gold()
+	if mode not in ["duel", "duel_result"]: bank_gold()
+	duel_enemy = null
+	$Zones.show()
 	mode = "menu"
 	paused = false
 	choice_open = false
