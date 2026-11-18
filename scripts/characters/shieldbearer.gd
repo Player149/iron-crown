@@ -26,4 +26,4 @@ func skill(key: String) -> void:
 	arena.fx_ring(position, 50, Color("bda0ed"), 0.35)
 
 func attack() -> void:
-	perform_swing(1.25 if useless_left > 0.0 else 1.0)
+	super.attack()
