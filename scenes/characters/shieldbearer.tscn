@@ -238,3 +238,6 @@ libraries/ = SubResource("Anims")
 [node name="Guard" type="Node2D" parent="." index="6" unique_id=904251208]
 script = ExtResource("6")
 shield_path = NodePath("../Visual/WeaponPivot1/WeaponPivot2/Shield")
+mode = "barrier"
+meter_max = 100.0
+meter_regen = 12.0
