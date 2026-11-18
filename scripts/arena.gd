@@ -360,13 +360,13 @@ func add_xp(f, amount: float) -> void:
 			sound("level", f)
 		else:
 			CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
-			if not CrownCatalog.options_for(f, f.level).is_empty(): CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
+			if not CrownCatalog.options_for(f, f.level).is_empty(): f = CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 	if f.is_player: process_choices()
 
 func advance_bot(f) -> void:
 	f.grow_level()
 	CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
-	if not CrownCatalog.options_for(f, f.level).is_empty(): CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
+	if not CrownCatalog.options_for(f, f.level).is_empty(): f = CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 
 func process_choices() -> void:
 	if choices.is_empty() or choice_open or paused or not is_instance_valid(player) or not player.alive: return
