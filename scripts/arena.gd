@@ -54,6 +54,9 @@ func setup_input() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch or event is InputEventScreenDrag: touch_mode = true
+	if active() and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
+		player.show_attack_range = not player.show_attack_range
+		player.queue_redraw()
 	if event.is_action_pressed("pause") and mode in ["play", "boss"] and not choice_open:
 		paused = not paused
 		ui.show_pause(paused)

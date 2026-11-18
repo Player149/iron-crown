@@ -1,12 +1,17 @@
 class_name CrownFighter
 extends CharacterBody2D
 
+const AttackRangePreview = preload("res://scripts/components/attack_range_preview.gd")
+
 @export var display_name: String = "기사"
 @export var is_player: bool = false
 @export var damage: float = 18.0
 @export var speed: float = 178.0
 @export var tint: Color = Color("78b4df")
 @export var attack_range_override: float = 0.0
+## Total attack angle in degrees. Zero uses the arena balance value.
+@export_range(0.0, 360.0, 0.1) var attack_arc_override_degrees: float = 0.0
+@export var show_attack_range: bool = false
 @export var definition: CrownCharacterDefinition = preload("res://data/characters/knight.tres")
 var abilities: Dictionary = {}
 var ability_players: Dictionary = {}
@@ -209,14 +214,24 @@ func attack() -> void:
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
 
+func attack_reach() -> float:
+	var base_reach: float = attack_range_override if attack_range_override > 0 else arena.balance.attack_range
+	return base_reach * body_scale
+
+func attack_arc_radians() -> float:
+	if attack_arc_override_degrees > 0.0:
+		return deg_to_rad(attack_arc_override_degrees)
+	return arena.balance.attack_arc
+
 func resolve_attack_hit() -> void:
 	if not can_act() or blocking or not arena.active(): return
-	var reach = (attack_range_override if attack_range_override > 0 else arena.balance.attack_range) * body_scale
+	var reach := attack_reach()
+	var arc := attack_arc_radians()
 	var count = 0
 	arena.fx_ring(position + Vector2.from_angle(facing) * 50, reach * 0.5, attack_color(), 0.15)
 	for target in arena.targets(self):
 		var offset: Vector2 = target.position - position
-		if offset.length() < reach + target.radius and absf(angle_difference(facing, offset.angle())) < arena.balance.attack_arc * 0.5:
+		if offset.length() < reach + target.radius and (arc >= TAU or absf(angle_difference(facing, offset.angle())) < arc * 0.5):
 			var critical = randf() < crit
 			arena.deal_damage(target, damage * (1.7 if critical else 1.0), self)
 			target.position += offset.normalized() * 5
@@ -328,3 +343,5 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 32 * body_scale, 0, TAU, 32, tint, evolutions.size() + 1)
 	if groggy_left > 0:
 		draw_arc(Vector2(0, -75), 10, 0, TAU * groggy_left / arena.balance.groggy_duration, 16, Color("ffc664"), 3)
+	if show_attack_range and arena != null:
+		AttackRangePreview.draw_sector(self, attack_reach(), attack_arc_radians(), facing, 42.0 * body_scale)

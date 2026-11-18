@@ -1,9 +1,9 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dqchglas0rlcp"]
 
-[ext_resource type="PackedScene" path="res://scenes/fighter.tscn" id="1"]
-[ext_resource type="Script" path="res://scripts/characters/spearman.gd" id="2"]
+[ext_resource type="PackedScene" uid="uid://bby3uw6vl8tuo" path="res://scenes/fighter.tscn" id="1"]
+[ext_resource type="Script" uid="uid://ym6ggymtw685" path="res://scripts/characters/spearman.gd" id="2"]
 [ext_resource type="Resource" path="res://data/characters/templates/spearman.tres" id="3"]
-[ext_resource type="Texture2D" path="res://assets/Spear.png" id="4"]
+[ext_resource type="Texture2D" uid="uid://cm3qhp688h417" path="res://assets/Spear.png" id="4"]
 
 [sub_resource type="Animation" id="Reset"]
 length = 0.001
@@ -82,16 +82,16 @@ _data = {
 &"swing": SubResource("Swing")
 }
 
-[node name="Spearman" instance=ExtResource("1")]
+[node name="Spearman" unique_id=1437213972 instance=ExtResource("1")]
 script = ExtResource("2")
 display_name = "창병"
 definition = ExtResource("3")
 
-[node name="Sword" type="Sprite2D" parent="Visual/WeaponPivot1/WeaponPivot2" index="0"]
+[node name="Spear" type="Sprite2D" parent="Visual/WeaponPivot1/WeaponPivot2" parent_id_path=PackedInt32Array(1827778914) index="0" unique_id=915006063]
 position = Vector2(0, -32)
 rotation = 0.7853982
 scale = Vector2(1.2, 1.2)
 texture = ExtResource("4")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." index="5" unique_id=961879843]
 libraries/ = SubResource("Anims")
