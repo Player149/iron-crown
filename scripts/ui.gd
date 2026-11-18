@@ -21,6 +21,13 @@ func _ready() -> void:
 		Meta.save_data()
 		arena.start_game(box.get_node("Boost").button_pressed))
 	box.get_node("Shop").pressed.connect(show_shop)
+	var duel_button := Button.new()
+	duel_button.name = "DuelTest"
+	duel_button.text = "1대1 전투 테스트 (플레이어 VS AI)"
+	duel_button.custom_minimum_size = Vector2(0, 50)
+	box.add_child(duel_button)
+	box.move_child(duel_button, box.get_node("Shop").get_index())
+	duel_button.pressed.connect(show_duel_select)
 	hud.get_node("Pause").pressed.connect(func():
 		if arena.choice_open: return
 		arena.paused = true
@@ -133,11 +140,33 @@ func show_choices(event: Dictionary) -> void:
 			arena.choice_open = false
 			arena.process_choices())
 
+func show_duel_select(player_pick: String = "", enemy_pick: String = "") -> void:
+	if player_pick.is_empty():
+		clear_modal("1대1 테스트 · 내 직업 선택", "Lv.5 동일 스탯 · 아이템/룬/XP/몬스터 없이 대전")
+		for choice in CrownCatalog.EVOLUTIONS[5]:
+			var selected_id: String = choice[0]
+			add_button(choice[1], func(): show_duel_select(selected_id))
+	else:
+		clear_modal("1대1 테스트 · AI 직업 선택", "내 직업: %s" % CrownCatalog.ROSTER.find(player_pick).title)
+		for choice in CrownCatalog.EVOLUTIONS[5]:
+			var selected_id: String = choice[0]
+			add_button(choice[1], func(): arena.start_duel(player_pick, selected_id))
+		add_button("이전 · 내 직업 다시 선택", show_duel_select)
+	add_button("취소 · 메인 메뉴", show_menu)
+
+func show_duel_result(won: bool, player_class: String, enemy_class: String, duration: float) -> void:
+	clear_modal("승리!" if won else "패배", "%s VS %s · 전투 %s\n동일 레벨/스탯, 부활 및 레벨업 없는 테스트" % [player_class, enemy_class, time_text(duration)])
+	add_button("같은 직업으로 재대결", func(): arena.start_duel(arena.duel_player_class, arena.duel_enemy_class))
+	add_button("직업 다시 선택", func():
+		arena.return_menu()
+		show_duel_select())
+	add_button("메인 메뉴", arena.return_menu)
+
 func show_pause(open: bool) -> void:
 	if not open:
 		modal.hide()
 		return
-	clear_modal("잠시 쉬어가기", "L: 레벨업 테스트 · B: 보스전 테스트 (Lv.10 이상)")
+	clear_modal("잠시 쉬어가기", "1대1 테스트 · 같은 레벨의 AI와 대전 중" if arena.mode == "duel" else "L: 레벨업 테스트 · B: 보스전 테스트 (Lv.10 이상)")
 	add_button("계속하기", func():
 		arena.paused = false
 		modal.hide()
@@ -146,7 +175,12 @@ func show_pause(open: bool) -> void:
 		Meta.muted = not Meta.muted
 		Meta.save_data()
 		show_pause(true))
-	add_button("메뉴로 · 골드 보관", arena.return_menu)
+	if arena.mode == "duel":
+		add_button("처음부터 재대결", func(): arena.start_duel(arena.duel_player_class, arena.duel_enemy_class))
+		add_button("직업 다시 선택", func():
+			arena.return_menu()
+			show_duel_select())
+	add_button("메뉴로 돌아가기", arena.return_menu)
 
 func show_result(title: String, details: String) -> void:
 	clear_modal(title, details)
@@ -215,23 +249,27 @@ func update_hud() -> void:
 	hud.get_node("Info/Health").value = 100 * p.hp / p.max_hp
 	hud.get_node("Info/Stamina").value = 100 * p.stamina / p.max_stamina
 	hud.get_node("Info/Groggy").value = 100 * p.groggy / arena.balance.groggy_threshold
-	hud.get_node("Info/XP").value = 100 if p.level == 40 else 100 * p.xp / arena.balance.xp_needed(p.level)
-	hud.get_node("Info/Stats").text = "HP %d/%d · 기력 %d/%d · 그로기 %d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), arena.run_gold, arena.run_kills, roundi(p.damage)]
+	hud.get_node("Info/XP").value = 0 if arena.mode in ["duel", "duel_result"] else (100 if p.level == 40 else 100 * p.xp / arena.balance.xp_needed(p.level))
+	hud.get_node("Info/Stats").text = ("HP %d/%d · 기력 %d/%d · 그로기 %d\n공격 %d · 직업 %s" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), roundi(p.damage), p.class_name_text]) if arena.mode in ["duel", "duel_result"] else ("HP %d/%d · 기력 %d/%d · 그로기 %d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), arena.run_gold, arena.run_kills, roundi(p.damage)])
 	if p.guard != null and p.guard.mode == "barrier":
 		hud.get_node("Info/Stats").text += " · 방패 %d/%d" % [ceili(p.guard.meter), roundi(p.guard.meter_max)]
 	hud.get_node("Info/Status").text = ("탈진 %.1f초" % p.exhaustion_left) if p.exhaustion_left > 0 else (("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투"))
-	if arena.mode == "boss" and arena.boss != null:
+	if arena.mode in ["duel", "duel_result"] and is_instance_valid(arena.duel_enemy):
+		var opponent = arena.duel_enemy
+		var opponent_barrier = " · 방패 %d" % ceili(opponent.guard.meter) if opponent.guard != null and opponent.guard.mode == "barrier" else ""
+		hud.get_node("Boss").text = "AI %s · HP %d/%d\n기력 %d · 그로기 %d%s" % [opponent.class_name_text, ceili(opponent.hp), roundi(opponent.max_hp), ceili(opponent.stamina), floori(opponent.groggy), opponent_barrier]
+	elif arena.mode == "boss" and arena.boss != null:
 		hud.get_node("Boss").text = "BOSS %s · %s\nHP %d / %d" % [arena.boss.display_name, time_text(arena.boss_timer), ceili(arena.boss.hp), roundi(arena.boss.max_hp)]
 	else: hud.get_node("Boss").text = "다음 보스 선정\n" + time_text(arena.boss_countdown)
 	var ranking = arena.fighters.filter(func(f): return f.alive)
 	ranking.sort_custom(func(a, b): return a.level > b.level if a.level != b.level else a.kills > b.kills)
 	var rank_text = "ARENA RANKING\n"
 	for f in ranking.slice(0, 5): rank_text += "%s  Lv.%d\n" % [f.display_name, f.level]
-	hud.get_node("Leaderboard").text = rank_text
+	hud.get_node("Leaderboard").text = "1 VS 1 · %s" % time_text(arena.elapsed) if arena.mode in ["duel", "duel_result"] else rank_text
 	var slots = ["평타", "대시", "E", "R", "Q"]
 	var keys = ["attack", "dash", "e", "r", "q"]
 	for i in 5:
-		if i >= 2 and p.evolutions.size() < i - 1: slots[i] += " Lv.%d" % [5, 15, 25][i - 2]
+		if i >= 2 and p.evolutions.size() < i - 1 and arena.mode not in ["duel", "duel_result"]: slots[i] += " Lv.%d" % [5, 15, 25][i - 2]
 		elif p.cooldown[keys[i]] > 0: slots[i] += " %.1f" % p.cooldown[keys[i]]
 	hud.get_node("Skills").text = "   |   ".join(slots)
 
