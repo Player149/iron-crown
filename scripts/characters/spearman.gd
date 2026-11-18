@@ -36,6 +36,10 @@ func tick(dt: float) -> void:
 	hit_lunge_path(old_position, position)
 	lunge_left = maxf(0.0, lunge_left - dt)
 
+func dash(direction: Vector2 = Vector2.ZERO) -> void:
+	if lunge_left > 0.0: return
+	super.dash(direction)
+
 func hit_lunge_path(start: Vector2, finish: Vector2) -> void:
 	if not arena.active(): return
 	var step: Vector2 = finish - start
