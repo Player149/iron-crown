@@ -47,6 +47,8 @@ var exhaustion_left: float = 0.0
 var damage_contributors: Dictionary = {} # attacker instance ID -> most recent hit time
 @onready var guard = get_node_or_null("Guard")
 var attack_lock: float = 0.0
+## Damage multiplier for current authored swing animation and its hit event.
+var swing_power: float = 1.0
 var combat_left: float = 0
 var no_hit_time: float = 99
 var groggy_left: float = 0
@@ -182,6 +184,7 @@ func trigger_exhaustion() -> void:
 	$AnimationPlayer.stop()
 	$Visual.position = Vector2.ZERO
 	reset_weapon_pose()
+	swing_power = 1.0
 	for animator in ability_players.values(): animator.stop()
 	arena.float_text(position, "탈진!", Color("ff9f70"))
 
@@ -205,14 +208,21 @@ func reset_guard() -> void:
 	attack_lock = 0.0
 	$AnimationPlayer.stop()
 
-func attack() -> void:
-	if not can_act() or guard_busy() or attack_lock > 0 or cooldown.attack > 0: return
-	if not spend_stamina(arena.balance.attack_stamina_cost): return
+func perform_swing(multiplier: float = 1.0, use_attack_cooldown: bool = true) -> bool:
+	if not can_act() or guard_busy() or attack_lock > 0: return false
+	if use_attack_cooldown and cooldown.attack > 0: return false
+	if not spend_stamina(arena.balance.attack_stamina_cost): return false
+	swing_power = multiplier
 	var swing: Animation = $AnimationPlayer.get_animation("swing")
 	attack_lock = swing.length / attack_speed
-	cooldown.attack = maxf(definition.attack_cooldown / attack_speed, attack_lock)
+	if use_attack_cooldown:
+		cooldown.attack = maxf(definition.attack_cooldown / attack_speed, attack_lock)
 	$AnimationPlayer.play("swing", -1, attack_speed)
 	arena.sound("swing", self)
+	return true
+
+func attack() -> void:
+	perform_swing()
 
 func attack_reach() -> float:
 	var base_reach: float = attack_range_override if attack_range_override > 0 else arena.balance.attack_range
@@ -233,7 +243,7 @@ func resolve_attack_hit() -> void:
 		var offset: Vector2 = target.position - position
 		if offset.length() < reach + target.radius and (arc >= TAU or absf(angle_difference(facing, offset.angle())) < arc * 0.5):
 			var critical = randf() < crit
-			arena.deal_damage(target, damage * (1.7 if critical else 1.0), self)
+			arena.deal_damage(target, damage * swing_power * (1.7 if critical else 1.0), self)
 			target.position += offset.normalized() * 5
 			count += 1
 			if groggy_left > 0 or (attack_target_limit > 0 and count >= attack_target_limit): break
