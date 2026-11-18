@@ -354,12 +354,14 @@ func run() -> void:
 			near(actor.stamina, barrier_stamina, "Barrier consumes no stamina when hit")
 			near(actor.guard.meter, 70.0, "Barrier meter loses incoming damage")
 			actor.guard.reset()
+			var old_damage = actor.damage
 			actor.skill("e")
 			near(actor.useless_left, 6.0, "Useless buff activates")
+			near(actor.damage, old_damage * 1.25, "Useless raises attack power by 25%")
 			actor.attack_lock = 0.0
 			actor.cooldown.attack = 0.0
 			actor.attack()
-			near(actor.swing_power, 1.25, "Useless raises attack power by 25%")
+			near(actor.swing_power, 1.0, "Useless does not double-count normal swing multiplier")
 	game.start_game()
 	p = game.player
 	game.add_xp(p, 1000000)
