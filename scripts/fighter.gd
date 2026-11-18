@@ -161,7 +161,7 @@ func ai_control(dt: float) -> void:
 	if guard != null: guard.requested = ai_block > 0
 	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
 	velocity = (offset.normalized() * toward + side) * speed * (0.5 if guard_busy() else 1.0)
-	if distance < 92: attack()
+	if distance < attack_reach(): attack()
 	if distance < 430 and randf() < dt * 0.5: skill("e")
 	if distance < 220 and randf() < dt * 0.3: skill("r")
 	if distance < 260 and randf() < dt * 0.18: skill("q")
