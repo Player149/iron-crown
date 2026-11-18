@@ -25,6 +25,12 @@ Godot 4.7.2에서 이 저장소의 `project.godot`을 가져온 뒤 실행(F6: �
 
 현재 SVG와 WAV는 교체 가능한 기본 에셋입니다. 이미지 변경만으로 판정 범위가 변하지는 않습니다. 기사의 `attack_range_override` 또는 공통 balance의 `attack_range`를 함께 조절하세요. 기술 동작은 `fighter.gd`의 skill 함수, 피해·보스·성장은 `arena.gd`에서 수정합니다.
 
+## Lv.5 네 갈래 진화 (2026-11-18)
+
+시작 캐릭터(나뭇가지 전사)는 Lv.5에서 망치병, 창병, 방패병, 검사 중 하나를 선택할 수 있습니다. 선택지는 `data/characters/roster.tres`의 `data/characters/{hammerman,spearman,shieldbearer,swordsman}.tres`에서 정의합니다. 각 정의의 `evolution_scene`은 `scenes/characters/*.tscn`을 가리킵니다. 씬의 원본 `templates/*.tres`는 편집용 기본 템플릿으로 독립 유지하여 순환 리소스 참조를 피합니다.
+
+`CrownCatalog.evolve()`는 선택 시 `arena.replace_fighter_scene()`으로 캐릭터 씬 자체를 교체합니다. 레벨·XP·체력·기력·스탯·처치 수·기존 스킬은 유지하고, 새 씬의 무기/공격 애니메이션/Guard 컴포넌트를 사용합니다. 망치병과 창병은 방어가 없으며, 방패병과 검사는 방어가 가능합니다. 플레이어와 AI 공통이며, Lv.15/25는 기존 진화 데이터가 남아 있고 현 캐릭터의 외형을 유지한 채 기존 스탯/스킬을 추가합니다. 신규 4종은 아직 전용 액티브 스킬과 수치 밸런스가 확정되지 않았습니다.
+
 ## 기본 캐릭터(나뭇가지 전사)
 
 기본형은 GitHub에 업로드된 64×64 투명 PNG(`assets/Character_Base.png`, `assets/Stick.png`)를 사용합니다. 위쪽(-Y)을 기본 정면으로 두며 `facing`은 타격 판정을 향하는 월드 각도, `Visual.rotation = facing + PI/2`는 위를 향해 그려진 몸체 스프라이트의 시각 회전값입니다. 몸체와 스틱은 독립 Sprite2D로 연결했고 `WeaponPivot` 회전 애니메이션을 재사용합니다. 픽셀 선명도를 위해 Visual의 텍스처 필터는 Nearest입니다. 기본형은 막기가 불가능하고 방패가 숨겨지며, 기존 진화 직업부터 막기가 가능해집니다. 이동·대시·기존 성장 시스템은 유지됩니다.
