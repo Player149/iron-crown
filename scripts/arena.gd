@@ -135,8 +135,7 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 		"groggy", "groggy_decay_left", "groggy_immunity", "dash_left",
 		"dash_velocity", "facing", "evolutions", "class_name_text",
 		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_block",
-		"respawn_timer", "attack_lock", "swing_power", "attack_range_override",
-		"attack_arc_override_degrees", "show_attack_range"
+		"respawn_timer", "attack_lock", "swing_power", "show_attack_range"
 	]
 	for key in state_keys:
 		var value = old_f.get(key)
