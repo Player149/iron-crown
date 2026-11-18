@@ -249,6 +249,49 @@ func run() -> void:
 	p.hp = 20
 	game.kill_target(stale_victim, p)
 	near(p.hp, p.max_hp, "Expired second contributor allows full heal")
+	# Confirm each of the four new Lv.5 choices swaps the actual fighter scene.
+	var new_choices = CrownCatalog.EVOLUTIONS[5]
+	check(new_choices.size() == 4, "Lv5 offers exactly four weapon evolutions")
+	var expected = {
+		"hammerman": ["hammerman.gd", "res://assets/hammer.png", false],
+		"spearman": ["spearman.gd", "res://assets/Spear.png", false],
+		"shieldbearer": ["shieldbearer.gd", "res://assets/Shield_Big1.png", true],
+		"swordsman": ["swordsman.gd", "res://assets/sword_A.png", true]
+	}
+	for choice in new_choices:
+		game.start_game()
+		var starter = game.player
+		starter.level = 5
+		starter.hp = 47.0
+		starter.stamina = 42.0
+		starter.kills = 3
+		var starter_index = game.fighters.find(starter)
+		var id: String = choice[0]
+		check(CrownCatalog.options_for(starter, 5).size() == 4, "Starter receives four evolution choices")
+		var evolved = CrownCatalog.evolve(starter, choice)
+		check(evolved == game.player and evolved != starter, "Evolution replaces player scene: " + id)
+		check(game.fighters[starter_index] == evolved, "Arena roster points to evolved actor: " + id)
+		check(evolved.get_script().resource_path.ends_with(expected[id][0]), "Subclass scene is active: " + id)
+		check(evolved.level == 5 and evolved.kills == 3, "Progress retained through evolution: " + id)
+		near(evolved.hp, 47.0, "Current HP retained: " + id)
+		near(evolved.stamina, 42.0, "Stamina retained: " + id)
+		check(evolved.evolutions == [id] and evolved.class_name_text == choice[1], "Evolution identity applied: " + id)
+		check(evolved.can_guard() == expected[id][2], "Guard component matches class: " + id)
+		var weapon_path = "Visual/WeaponPivot1/WeaponPivot2/Shield" if id == "shieldbearer" else "Visual/WeaponPivot1/WeaponPivot2/Sword"
+		check(evolved.has_node(weapon_path), "Class-specific weapon node exists: " + id)
+		if evolved.has_node(weapon_path):
+			check(evolved.get_node(weapon_path).texture.resource_path == expected[id][1], "Class weapon sprite applied: " + id)
+		check(evolved.get_node("AnimationPlayer").has_animation("swing"), "Class attack animation exists: " + id)
+		var advanced = CrownCatalog.options_for(evolved, 15)
+		check(not advanced.is_empty(), "Lv15 options still available after new evolution: " + id)
+	# AI uses the same scene-replacement route.
+	game.start_game()
+	var ai_starter = game.fighters[1]
+	ai_starter.level = 5
+	var ai_index = game.fighters.find(ai_starter)
+	var ai_evolved = CrownCatalog.evolve(ai_starter, new_choices[0])
+	check(not ai_evolved.is_player and game.fighters[ai_index] == ai_evolved, "AI evolution updates fighter roster")
+
 	game.start_game()
 	p = game.player
 	game.add_xp(p, 1000000)
@@ -261,17 +304,19 @@ func run() -> void:
 	game.choices.clear()
 	game.choice_open = false
 	game.ui.modal.hide()
-	for level in [5, 15, 25]: CrownCatalog.evolve(p, CrownCatalog.EVOLUTIONS[level][0])
-	p.skill("e")
+	for level in [5, 15, 25]:
+		p = CrownCatalog.evolve(p, CrownCatalog.EVOLUTIONS[level][0])
+	check(p == game.player and p.evolutions.size() == 3, "Later evolutions retain the replaced player actor")
+	check(not p.abilities.has("e") and p.abilities.has("r") and p.abilities.has("q"), "Existing Lv15/Lv25 skills remain available")
 	p.skill("r")
 	p.skill("q")
-	check(p.cooldown.e > 0 and p.cooldown.r > 0 and p.cooldown.q > 0, "All evolved skills execute")
+	check(p.cooldown.r > 0 and p.cooldown.q > 0, "Later evolution skills execute")
 	check(game.get_node("Projectiles").get_child_count() == 0, "Skill input waits for animation event")
-	p.ability_players.e.advance(0.201)
+	p.ability_players.q.advance(0.201)
 	await process_frame
-	check(game.get_node("Projectiles").get_child_count() == 1, "Skill animation event launches projectile")
-	p.resolve_skill_hit("e")
-	check(game.get_node("Projectiles").get_child_count() == 1, "Repeated event cannot duplicate consumed cast")
+	check(game.get_node("Projectiles").get_child_count() == 12, "Lv25 skill animation event launches projectiles")
+	p.resolve_skill_hit("q")
+	check(game.get_node("Projectiles").get_child_count() == 12, "Repeated event cannot duplicate consumed cast")
 	check(game.spawn_fighter(false).abilities.is_empty(), "Equipped skills are isolated per fighter")
 	var hp_before: float = p.hp
 	var damage_before: float = p.damage
