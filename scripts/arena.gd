@@ -438,10 +438,11 @@ func add_xp(f, amount: float) -> void:
 			if not CrownCatalog.options_for(f, f.level).is_empty(): f = CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 	if f.is_player: process_choices()
 
-func advance_bot(f) -> void:
+func advance_bot(f):
 	f.grow_level()
 	CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
 	if not CrownCatalog.options_for(f, f.level).is_empty(): f = CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
+	return f
 
 func process_choices() -> void:
 	if choices.is_empty() or choice_open or paused or not is_instance_valid(player) or not player.alive: return
@@ -454,8 +455,9 @@ func start_boss(manual: bool = false) -> void:
 	if manual and player.level >= 10 and participants.size() < 2:
 		for f in fighters:
 			if f != player and f.alive:
-				while f.level < 10: advance_bot(f)
-				participants.append(f)
+				var contender = f
+				while contender.level < 10: contender = advance_bot(contender)
+				participants.append(contender)
 				break
 	if participants.size() < 2:
 		boss_countdown = 60
