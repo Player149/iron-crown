@@ -7,7 +7,12 @@ var feed_lines: Array = []
 var last_window_size = Vector2i.ZERO
 var last_touch_mode: bool = false
 var compact: bool = false
-var stat_button: Button
+var stat_rows: Dictionary = {}
+var evolution_choice_count: int = 0
+@onready var stat_panel: PanelContainer = $Root/HUD/StatPanel
+@onready var stat_items: VBoxContainer = $Root/HUD/StatPanel/Items
+@onready var evolution_panel: PanelContainer = $Root/HUD/EvolutionPanel
+@onready var evolution_items: HBoxContainer = $Root/HUD/EvolutionPanel/Items/Choices
 @onready var menu = $Root/Menu
 @onready var box = $Root/Menu/Center/Box
 @onready var hud = $Root/HUD
@@ -29,11 +34,21 @@ func _ready() -> void:
 	box.add_child(duel_button)
 	box.move_child(duel_button, box.get_node("Shop").get_index())
 	duel_button.pressed.connect(show_duel_select)
-	stat_button = Button.new()
-	stat_button.name = "StatInvestment"
-	stat_button.text = "스탯 투자 +1"
-	hud.add_child(stat_button)
-	stat_button.pressed.connect(show_stat_allocation)
+	# Build small click targets inside the editor-authored HUD panel.
+	for i in CrownBuilds.ORDER.size():
+		var stat: String = CrownBuilds.ORDER[i]
+		var row = HBoxContainer.new()
+		var label = Label.new()
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.add_theme_font_size_override("font_size", 13)
+		row.add_child(label)
+		var add = Button.new()
+		add.text = "+"
+		add.custom_minimum_size = Vector2(30, 30)
+		add.pressed.connect(func(): invest_stat(stat))
+		row.add_child(add)
+		stat_items.add_child(row)
+		stat_rows[stat] = {"row": row, "label": label, "button": add}
 	hud.get_node("Pause").pressed.connect(func():
 		if arena.choice_open: return
 		arena.paused = true
@@ -84,6 +99,8 @@ func _process(dt: float) -> void:
 
 
 func show_menu() -> void:
+	stat_panel.hide()
+	evolution_panel.hide()
 	menu.show()
 	hud.hide()
 	modal.hide()
@@ -98,6 +115,7 @@ func show_game() -> void:
 	menu.hide()
 	modal.hide()
 	hud.show()
+	refresh_growth_panels()
 	touch.clear_input()
 
 func clear_modal(title: String, subtitle: String = "") -> void:
@@ -130,42 +148,61 @@ func add_button(text: String, callback: Callable, parent: Node = null) -> Button
 	style_buttons(button)
 	return button
 
-func close_stat_allocation() -> void:
-	modal.hide()
-	arena.choice_open = false
-	arena.process_choices()
+## Stats are always visible when points remain and never open a blocking modal.
+func invest_stat(stat: String) -> void:
+	if arena == null or arena.mode != "play" or arena.paused or not is_instance_valid(arena.player): return
+	if CrownBuilds.invest(arena.player, stat): refresh_growth_panels()
 
-func show_stat_allocation() -> void:
-	if arena == null or arena.mode != "play" or not is_instance_valid(arena.player): return
-	arena.choice_open = true
+func refresh_growth_panels() -> void:
+	if arena == null or not is_instance_valid(arena.player): return
 	var f = arena.player
-	clear_modal("스탯 분배 · 남은 포인트 %d" % f.stat_points, "1레벨당 1포인트 · 스탯별 최대 8단계 · 자동 레벨 성장 별도")
-	for id in CrownBuilds.ORDER:
-		var stat: String = id
-		var info: Array = CrownBuilds.STAT_INFO[stat]
-		var rank: int = int(f.stat_allocations.get(stat, 0))
-		var button = add_button("%s  %d/%d   ·   %s" % [info[0], rank, CrownBuilds.MAX_RANK, info[1]], func():
-			if CrownBuilds.invest(arena.player, stat):
-				if arena.player.stat_points > 0: show_stat_allocation()
-				else: close_stat_allocation())
-		button.disabled = not CrownBuilds.can_spend(f, stat)
-	add_button("완료 · 게임으로 돌아가기", close_stat_allocation)
+	var show_stats: bool = arena.mode == "play" and f.alive and f.stat_points > 0
+	stat_panel.visible = show_stats
+	if show_stats:
+		stat_items.get_node("Title").text = "스탯 포인트 %d · 1~6" % f.stat_points
+		for i in CrownBuilds.ORDER.size():
+			var id: String = CrownBuilds.ORDER[i]
+			var rank: int = int(f.stat_allocations.get(id, 0))
+			var entry: Dictionary = stat_rows[id]
+			entry.label.text = "%d %s %d/%d" % [i + 1, CrownBuilds.STAT_INFO[id][0], rank, CrownBuilds.MAX_RANK]
+			entry.button.disabled = not CrownBuilds.can_spend(f, id)
 
 func show_choices(event: Dictionary) -> void:
-	var evolution = event.kind == "evolution"
-	clear_modal("진화할 계통을 선택하세요" if evolution else "능력 하나를 선택하세요", "LEVEL %d  ·  이번 생존 동안 유지됩니다" % event.level)
-	var options = CrownCatalog.options_for(arena.player, event.level) if evolution else CrownCatalog.STATS.duplicate()
-	if not evolution:
-		options.shuffle()
-		options = options.slice(0, 3)
+	# Evolution is an in-game overlay. Player, AI and physics keep running.
+	if event.kind != "evolution":
+		arena.choice_open = false
+		arena.process_choices()
+		return
+	var options: Array = CrownCatalog.options_for(arena.player, event.level)
+	if options.is_empty():
+		arena.choice_open = false
+		arena.process_choices()
+		return
+	for child in evolution_items.get_children():
+		evolution_items.remove_child(child)
+		child.queue_free()
+	evolution_choice_count = options.size()
+	evolution_panel.show()
+	evolution_panel.get_node("Items/Title").text = "Lv.%d 진화 선택 · 전투 진행 중" % event.level
 	for choice in options:
-		var selected = choice
-		add_button("%s\n%s" % [choice[1], choice[2]], func():
-			if evolution: CrownCatalog.evolve(arena.player, selected)
-			else: CrownCatalog.apply_stat(arena.player, selected[0])
-			modal.hide()
-			arena.choice_open = false
-			arena.process_choices())
+		var selected: Array = choice
+		var button = Button.new()
+		button.text = "%s\n%s" % [choice[1], choice[2]]
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size.y = 72
+		button.pressed.connect(func(): select_evolution(selected))
+		evolution_items.add_child(button)
+		style_buttons(button)
+	refresh_layout(true)
+
+func select_evolution(selected: Array) -> void:
+	if not evolution_panel.visible or arena == null or arena.mode != "play": return
+	CrownCatalog.evolve(arena.player, selected)
+	evolution_panel.hide()
+	arena.choice_open = false
+	refresh_growth_panels()
+	arena.process_choices()
 
 func show_duel_select(player_pick: String = "", enemy_pick: String = "") -> void:
 	if player_pick.is_empty():
@@ -273,9 +310,7 @@ func update_hud() -> void:
 	if arena == null or not is_instance_valid(arena.player): return
 	var p = arena.player
 	hud.get_node("Info/Name").text = "%s · Lv.%d · SP %d" % [p.display_name, p.level, p.stat_points]
-	stat_button.visible = arena.mode == "play"
-	stat_button.disabled = p.stat_points <= 0
-	stat_button.text = "스탯 투자 +%d" % p.stat_points
+	refresh_growth_panels()
 	hud.get_node("Info/Health").value = 100 * p.hp / p.max_hp
 	hud.get_node("Info/Stamina").value = 100 * p.stamina / p.max_stamina
 	hud.get_node("Info/Groggy").value = 100 * p.groggy / arena.balance.groggy_threshold
@@ -336,12 +371,26 @@ Shift 달리기 · Space 대시 · E/R/Q 기술
 모바일: 조이스틱 + 전투 버튼 / 세로·가로 자동 전환"
 	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 172))
 	place_hud("Pause", Rect2(width - 112, 16, 96, 48))
-	place_hud("StatInvestment", Rect2(width - 156, 68, 140, 42))
-	place_hud("Boss", Rect2(16, 202, width - 32, 54) if compact else Rect2(width / 2 - 160, 18, 320, 54))
+	# Keep stats beneath health bars and away from the center of combat.
+	var stats_width: float = 166 if compact else 198
+	var stat_y: float = 196
+	place_hud("StatPanel", Rect2(12, stat_y, stats_width, 254))
+	stat_items.get_node("Title").add_theme_font_size_override("font_size", 12 if compact else 14)
+	for entry in stat_rows.values():
+		entry.label.add_theme_font_size_override("font_size", 11 if compact else 13)
+	# Center a single choice, distribute any number of choices evenly.
+	# Available width is divided by the actual number of evolutions.
+	var count: int = maxi(1, evolution_choice_count)
+	var evolution_width: float = minf(width - 24, float(count) * (114 if compact else 172) + 16)
+	place_hud("EvolutionPanel", Rect2((width - evolution_width) * 0.5, 80 if compact else 88, evolution_width, 104))
+	for choice_button in evolution_items.get_children():
+		if choice_button is Button:
+			choice_button.add_theme_font_size_override("font_size", 11 if compact else 14)
+	place_hud("Boss", Rect2(12 + stats_width + 8, 202, maxf(116, width - stats_width - 40), 64) if compact else Rect2(width / 2 - 160, 18, 320, 54))
 	hud.get_node("Boss").add_theme_font_size_override("font_size", 15 if compact else 18)
 	hud.get_node("Leaderboard").visible = not compact
 	hud.get_node("Feed").visible = not compact
-	place_hud("Notice", Rect2(16, height * 0.32, width - 32, 80))
+	place_hud("Notice", Rect2(16, maxf(300, height * 0.47), width - 32, 80))
 	hud.get_node("Notice").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var mobile = arena != null and arena.touch_mode
 	var bottom = 320 if mobile and ratio < 1 else (280 if mobile else 68)
