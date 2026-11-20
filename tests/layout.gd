@@ -43,7 +43,7 @@ func run() -> void:
 		game.ui.show_shop()
 		await settle()
 		verify(screen.encloses(game.ui.panel.get_global_rect()), "Shop fits " + str(dimensions))
-		game.ui.show_choices({"kind": "evolution", "level": 25})
+		game.ui.show_choices({"kind": "evolution", "level": 21})
 		await settle()
 		verify(screen.encloses(game.ui.panel.get_global_rect()), "Evolution modal fits " + str(dimensions))
 		game.ui.show_game()
