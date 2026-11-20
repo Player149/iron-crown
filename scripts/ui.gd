@@ -196,7 +196,7 @@ func show_choices(event: Dictionary) -> void:
 		button.pressed.connect(func(): select_evolution(selected))
 		evolution_items.add_child(button)
 		style_buttons(button)
-	refresh_layout(true)
+	layout_evolution_panel(float(get_window().content_scale_size.x))
 
 func select_evolution(selected: Array) -> void:
 	if not evolution_panel.visible or arena == null or arena.mode != "play": return
@@ -380,14 +380,7 @@ Shift 달리기 · Space 대시 · E/R/Q 기술
 	stat_items.get_node("Title").add_theme_font_size_override("font_size", 12 if compact else 14)
 	for entry in stat_rows.values():
 		entry.label.add_theme_font_size_override("font_size", 11 if compact else 13)
-	# Center a single choice, distribute any number of choices evenly.
-	# Available width is divided by the actual number of evolutions.
-	var count: int = maxi(1, evolution_choice_count)
-	var evolution_width: float = minf(width - 24, float(count) * (114 if compact else 172) + 16)
-	place_hud("EvolutionPanel", Rect2((width - evolution_width) * 0.5, 80 if compact else 88, evolution_width, 104))
-	for choice_button in evolution_items.get_children():
-		if choice_button is Button:
-			choice_button.add_theme_font_size_override("font_size", 11 if compact else 14)
+	layout_evolution_panel(width)
 	place_hud("Boss", Rect2(12 + stats_width + 8, 202, maxf(116, width - stats_width - 40), 64) if compact else Rect2(width / 2 - 160, 18, 320, 54))
 	hud.get_node("Boss").add_theme_font_size_override("font_size", 15 if compact else 18)
 	hud.get_node("Leaderboard").visible = not compact
@@ -401,6 +394,15 @@ Shift 달리기 · Space 대시 · E/R/Q 기술
 	place_hud("Minimap", Rect2(width - 222, height - 168, 198, 136))
 	touch.clear_input()
 	touch.queue_redraw()
+
+func layout_evolution_panel(width: float) -> void:
+	# Choice count determines a centered width; no scene resize or input reset.
+	var count: int = maxi(1, evolution_choice_count)
+	var evolution_width: float = minf(width - 24, float(count) * (114 if compact else 172) + 16)
+	place_hud("EvolutionPanel", Rect2((width - evolution_width) * 0.5, 80 if compact else 88, evolution_width, 104))
+	for choice_button in evolution_items.get_children():
+		if choice_button is Button:
+			choice_button.add_theme_font_size_override("font_size", 11 if compact else 14)
 
 func place_hud(node_name: String, rect: Rect2) -> void:
 	var control = hud.get_node(node_name)
