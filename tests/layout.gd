@@ -16,9 +16,9 @@ func settle() -> void:
 	for i in 5: await get_tree().process_frame
 
 func run() -> void:
-	get_tree().get_tree().root.get_node("Meta").muted = true
+	get_tree().root.get_node("Meta").muted = true
 	var game = load("res://scenes/main.tscn").instantiate()
-	get_tree().get_tree().root.add_child(game)
+	get_tree().root.add_child(game)
 	game.set_physics_process(false)
 	game.touch_mode = true
 	game.start_game()
