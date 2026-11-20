@@ -38,13 +38,10 @@ jobs:
       - name: Import project
         run: godot --headless --path . --editor --quit
       - name: Verify combat, progression and boss restoration
-        continue-on-error: true
         run: timeout 15s godot --headless --path . res://tests/run.tscn
       - name: Verify portrait and landscape layouts
-        continue-on-error: true
         run: timeout 15s godot --headless --path . res://tests/layout.tscn
       - name: Verify moving attacks preserve world position
-        continue-on-error: true
         run: timeout 15s godot --headless --path . res://tests/playback.tscn
       - name: Export Web
         run: |
