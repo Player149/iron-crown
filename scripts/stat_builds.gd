@@ -63,14 +63,21 @@ static func choose_ai_stat(f) -> String:
 	var priority: Array = profile["priority"]
 	var weight: Array = profile["weight"]
 	var best := ""
-	var lowest := INF
-	# Lowest relative investment to the profile target, with stable tie-breaking.
+	var largest_deficit := -INF
+	var total_spent: int = 0
+	var total_weight: int = 0
+	for amount in f.stat_allocations.values(): total_spent += int(amount)
+	for amount in weight: total_weight += int(amount)
+	# Prefer the most underfunded role stat, rather than spreading the first six
+	# levels evenly across all six stats.
 	for i in priority.size():
 		var stat: String = priority[i]
-		if int(f.stat_allocations.get(stat, 0)) >= MAX_RANK: continue
-		var ratio: float = float(f.stat_allocations.get(stat, 0)) / float(weight[i])
-		if ratio < lowest:
-			lowest = ratio
+		var rank: int = int(f.stat_allocations.get(stat, 0))
+		if rank >= MAX_RANK: continue
+		var desired: float = float(total_spent + 1) * float(weight[i]) / float(total_weight)
+		var deficit: float = desired - float(rank)
+		if deficit > largest_deficit:
+			largest_deficit = deficit
 			best = stat
 	return best
 
