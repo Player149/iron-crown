@@ -6,6 +6,6 @@ script = ExtResource("1")
 id = "hammerman"
 title = "망치병"
 description = "느린 회전 강타 · 망치 전용 공격 모션"
-unlock_level = 5
+unlock_level = 6
 parent_ids = PackedStringArray("knight")
 evolution_scene = ExtResource("2")
