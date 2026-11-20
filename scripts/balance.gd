@@ -2,9 +2,9 @@ class_name CrownBalance
 extends Resource
 
 @export_category("Base growth")
-@export var max_level: int = 40
+@export var max_level: int = 25
 @export var starting_hp: float = 100.0
-@export var final_hp: float = 400.0
+@export var final_hp: float = 285.0
 @export_category("Groggy - provisional balance")
 @export var groggy_threshold: float = 100.0
 @export var groggy_hit: float = 6.0
@@ -43,4 +43,4 @@ extends Resource
 @export var boss_duration: float = 180.0
 
 func xp_needed(level: int) -> float:
-	return floor(38.0 + level * 15.0 + pow(level, 1.28) * 5.0)
+	return floor(30.0 + level * 12.0 + pow(level, 1.2) * 2.7)
