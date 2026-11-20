@@ -61,14 +61,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	if active() and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
 		player.show_attack_range = not player.show_attack_range
 		player.queue_redraw()
-	if event.is_action_pressed("pause") and mode in ["play", "boss", "duel"] and not choice_open:
+	if event.is_action_pressed("pause") and mode in ["play", "boss", "duel"]:
 		paused = not paused
 		ui.show_pause(paused)
+	# Number keys invest without interrupting movement, combat or AI.
+	if active() and mode == "play" and event is InputEventKey and event.pressed and not event.echo:
+		var stat_index: int = -1
+		match event.physical_keycode:
+			KEY_1, KEY_KP_1: stat_index = 0
+			KEY_2, KEY_KP_2: stat_index = 1
+			KEY_3, KEY_KP_3: stat_index = 2
+			KEY_4, KEY_KP_4: stat_index = 3
+			KEY_5, KEY_KP_5: stat_index = 4
+			KEY_6, KEY_KP_6: stat_index = 5
+		if stat_index >= 0 and player.stat_points > 0:
+			ui.invest_stat(CrownBuilds.ORDER[stat_index])
+			get_viewport().set_input_as_handled()
 	if active() and event.is_action_pressed("level_test") and mode == "play": add_xp(player, balance.xp_needed(player.level) - player.xp + 1)
 	if active() and event.is_action_pressed("boss_test"): start_boss(true)
 
 func active() -> bool:
-	return mode in ["play", "boss", "duel"] and not paused and not choice_open
+	return mode in ["play", "boss", "duel"] and not paused
 
 func start_game(boost: bool = false) -> void:
 	$Zones.show()
