@@ -120,8 +120,8 @@ func run() -> void:
 	p.hp = 20
 	p.grow_level()
 	near(p.hp, 20 + p.max_hp * 0.15, "Level heals 15% of maximum HP")
-	for i in 38: p.grow_level()
-	near(p.max_hp, 400, "Level 40 base HP")
+	for i in 23: p.grow_level()
+	near(p.max_hp, 285, "Level 25 automatic HP growth")
 	near(p.max_stamina, 100, "Level-ups do not increase maximum stamina")
 	p.reset_groggy()
 	p.hp = p.max_hp
@@ -250,8 +250,8 @@ func run() -> void:
 	game.kill_target(stale_victim, p)
 	near(p.hp, p.max_hp, "Expired second contributor allows full heal")
 	# Confirm each of the four new Lv.5 choices swaps the actual fighter scene.
-	var new_choices = CrownCatalog.EVOLUTIONS[5]
-	check(new_choices.size() == 4, "Lv5 offers exactly four weapon evolutions")
+	var new_choices = CrownCatalog.EVOLUTIONS[6]
+	check(new_choices.size() == 4, "Lv6 offers exactly four weapon evolutions")
 	var expected = {
 		"hammerman": ["hammerman.gd", "res://assets/hammer.png", false, "Hammer"],
 		"spearman": ["spearman.gd", "res://assets/Spear.png", true, "Spear"],
@@ -261,18 +261,18 @@ func run() -> void:
 	for choice in new_choices:
 		game.start_game()
 		var starter = game.player
-		starter.level = 5
+		starter.level = 6
 		starter.hp = 47.0
 		starter.stamina = 42.0
 		starter.kills = 3
 		var starter_index = game.fighters.find(starter)
 		var id: String = choice[0]
-		check(CrownCatalog.options_for(starter, 5).size() == 4, "Starter receives four evolution choices")
+		check(CrownCatalog.options_for(starter, 6).size() == 4, "Starter receives four evolution choices")
 		var evolved = CrownCatalog.evolve(starter, choice)
 		check(evolved == game.player and evolved != starter, "Evolution replaces player scene: " + id)
 		check(game.fighters[starter_index] == evolved, "Arena roster points to evolved actor: " + id)
 		check(evolved.get_script().resource_path.ends_with(expected[id][0]), "Subclass scene is active: " + id)
-		check(evolved.level == 5 and evolved.kills == 3, "Progress retained through evolution: " + id)
+		check(evolved.level == 6 and evolved.kills == 3, "Progress retained through evolution: " + id)
 		near(evolved.hp, 47.0, "Current HP retained: " + id)
 		near(evolved.stamina, 42.0, "Stamina retained: " + id)
 		check(evolved.evolutions == [id] and evolved.class_name_text == choice[1], "Evolution identity applied: " + id)
@@ -282,12 +282,12 @@ func run() -> void:
 		if evolved.has_node(weapon_path):
 			check(evolved.get_node(weapon_path).texture.resource_path == expected[id][1], "Class weapon sprite applied: " + id)
 		check(evolved.get_node("AnimationPlayer").has_animation("swing"), "Class attack animation exists: " + id)
-		var advanced = CrownCatalog.options_for(evolved, 15)
-		check(not advanced.is_empty(), "Lv15 options still available after new evolution: " + id)
+		var advanced = CrownCatalog.options_for(evolved, 13)
+		check(not advanced.is_empty(), "Lv13 options still available after new evolution: " + id)
 	# AI uses the same scene-replacement route.
 	game.start_game()
 	var ai_starter = game.fighters[1]
-	ai_starter.level = 5
+	ai_starter.level = 6
 	var ai_index = game.fighters.find(ai_starter)
 	var ai_evolved = CrownCatalog.evolve(ai_starter, new_choices[0])
 	check(not ai_evolved.is_player and game.fighters[ai_index] == ai_evolved, "AI evolution updates fighter roster")
@@ -301,8 +301,8 @@ func run() -> void:
 	]:
 		game.start_game()
 		var actor = game.player
-		actor.level = 5
-		var picked = CrownCatalog.EVOLUTIONS[5].filter(func(c): return c[0] == spec[0])[0]
+		actor.level = 6
+		var picked = CrownCatalog.EVOLUTIONS[6].filter(func(c): return c[0] == spec[0])[0]
 		actor = CrownCatalog.evolve(actor, picked)
 		actor.stamina = actor.max_stamina
 		actor.invuln = 0
@@ -365,16 +365,16 @@ func run() -> void:
 	game.start_game()
 	p = game.player
 	game.add_xp(p, 1000000)
-	check(p.level == 40, "Level cap is 40")
-	var evolution_levels: Array = []
+	check(p.level == 25, "Level cap is 25")
+	var evolution_levels: Array = [6] if game.choice_open else []
 	# First open modal consumes a stat event; evolutions remain queued.
 	for choice in game.choices:
 		if choice.kind == "evolution": evolution_levels.append(choice.level)
-	check(evolution_levels == [5, 15, 25], "Evolution thresholds 5 / 15 / 25")
+	check(evolution_levels == [6, 13, 21], "Evolution thresholds 6 / 13 / 21")
 	game.choices.clear()
 	game.choice_open = false
 	game.ui.modal.hide()
-	for level in [5, 15, 25]:
+	for level in [6, 13, 21]:
 		p = CrownCatalog.evolve(p, CrownCatalog.EVOLUTIONS[level][0])
 	check(p == game.player and p.evolutions.size() == 3, "Later evolutions retain the replaced player actor")
 	check(not p.abilities.has("e") and p.abilities.has("r") and p.abilities.has("q"), "Existing Lv15/Lv25 skills remain available")
@@ -409,7 +409,7 @@ func run() -> void:
 	check(game.fighters.size() == 2 and game.monsters.is_empty(), "Duel spawns exactly two fighters without monsters")
 	check(game.player != game.duel_enemy and not game.duel_enemy.is_player, "Duel assigns a human and an AI")
 	check(game.player.class_name_text == "창병" and game.duel_enemy.class_name_text == "방패병", "Duel picks the requested classes")
-	check(game.player.level == 5 and game.duel_enemy.level == 5, "Duel starts both at Lv5")
+	check(game.player.level == 6 and game.duel_enemy.level == 6, "Duel starts both at Lv6")
 	near(game.player.max_hp, game.duel_enemy.max_hp, "Duel players have equal maximum HP")
 	near(game.player.damage, game.duel_enemy.damage, "Duel players have equal base attack")
 	near(game.player.stamina, game.duel_enemy.stamina, "Duel players start with equal stamina")
