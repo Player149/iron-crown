@@ -63,7 +63,7 @@ func run() -> void:
 	p.dash_left = 0
 	p.cooldown.dash = 0
 	# Guard coverage uses the shield archetype, not a guard bolted onto the starter.
-	var defender = load("res://scenes/characters/shieldbearer.tscn").instantiate()
+	var defender = load("res://scenes/characters/swordsman.tscn").instantiate()
 	defender.arena = game
 	defender.is_player = true
 	defender.position = p.position
@@ -253,10 +253,10 @@ func run() -> void:
 	var new_choices = CrownCatalog.EVOLUTIONS[5]
 	check(new_choices.size() == 4, "Lv5 offers exactly four weapon evolutions")
 	var expected = {
-		"hammerman": ["hammerman.gd", "res://assets/hammer.png", false],
-		"spearman": ["spearman.gd", "res://assets/Spear.png", false],
-		"shieldbearer": ["shieldbearer.gd", "res://assets/Shield_Big1.png", true],
-		"swordsman": ["swordsman.gd", "res://assets/sword_A.png", true]
+		"hammerman": ["hammerman.gd", "res://assets/hammer.png", false, "Hammer"],
+		"spearman": ["spearman.gd", "res://assets/Spear.png", true, "Spear"],
+		"shieldbearer": ["shieldbearer.gd", "res://assets/Shield_Big1.png", true, "Shield"],
+		"swordsman": ["swordsman.gd", "res://assets/sword_A.png", true, "Sword"]
 	}
 	for choice in new_choices:
 		game.start_game()
@@ -277,7 +277,7 @@ func run() -> void:
 		near(evolved.stamina, 42.0, "Stamina retained: " + id)
 		check(evolved.evolutions == [id] and evolved.class_name_text == choice[1], "Evolution identity applied: " + id)
 		check(evolved.can_guard() == expected[id][2], "Guard component matches class: " + id)
-		var weapon_path = "Visual/WeaponPivot1/WeaponPivot2/Shield" if id == "shieldbearer" else "Visual/WeaponPivot1/WeaponPivot2/Sword"
+		var weapon_path = "Visual/WeaponPivot1/WeaponPivot2/" + expected[id][3]
 		check(evolved.has_node(weapon_path), "Class-specific weapon node exists: " + id)
 		if evolved.has_node(weapon_path):
 			check(evolved.get_node(weapon_path).texture.resource_path == expected[id][1], "Class weapon sprite applied: " + id)
