@@ -19,6 +19,11 @@ var pending_skills: Dictionary = {}
 var attack_target_limit: int = 2
 var arena
 var level: int = 1
+## Manual progression points; all six stats cap at eight ranks.
+var stat_points: int = 1
+var stat_allocations: Dictionary = CrownBuilds.create_allocations()
+## AI uses a consistent playstyle rather than random stat purchases.
+var ai_build: String = "assault"
 var xp: float = 0
 var max_hp: float = 100
 var hp: float = 100
@@ -89,7 +94,7 @@ func _ready() -> void:
 
 func snapshot_stats() -> Dictionary:
 	var result = {}
-	for key in ["max_hp", "damage", "speed", "attack_speed", "armor", "crit", "lifesteal", "skill_power", "xp_gain", "body_scale", "dash_mult", "block_reduction", "gold_bonus"]:
+	for key in ["max_hp", "max_stamina", "damage", "speed", "attack_speed", "armor", "crit", "lifesteal", "skill_power", "xp_gain", "body_scale", "dash_mult", "block_reduction", "gold_bonus"]:
 		result[key] = get(key)
 	return result
 
@@ -327,7 +332,9 @@ func reset_groggy() -> void:
 	groggy_immunity = 0
 
 func grow_level() -> void:
+	if level >= arena.balance.max_level: return
 	level += 1
+	stat_points += 1
 	var hp_gain = (arena.balance.final_hp - arena.balance.starting_hp) / (arena.balance.max_level - 1)
 	max_hp += hp_gain
 	base_stats.max_hp += hp_gain
@@ -341,7 +348,7 @@ func update_visual() -> void:
 	$Visual.rotation = facing + PI / 2.0
 	$Visual.scale = Vector2.ONE * body_scale
 	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else Color.WHITE)
-	$NameLabel.text = "%s · Lv.%d" % [display_name, level]
+	$NameLabel.text = "%s · %s · Lv.%d" % [display_name, CrownBuilds.profile_title(ai_build), level] if not is_player else "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
 	if guard != null: guard.update_visual()
 	queue_redraw()
