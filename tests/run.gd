@@ -371,9 +371,22 @@ func run() -> void:
 	for choice in game.choices:
 		if choice.kind == "evolution": evolution_levels.append(choice.level)
 	check(evolution_levels == [6, 13, 21], "Evolution thresholds 6 / 13 / 21")
+	check(game.active(), "Pending evolution does not pause player or AI combat")
+	check(game.ui.evolution_panel.visible, "Evolution appears on HUD instead of covering modal")
+	check(not game.ui.modal.visible, "Evolution UI does not show fullscreen modal")
+	check(game.ui.evolution_choice_count == 4, "Four options appear in top evolution row")
+	game.ui.select_evolution(CrownCatalog.EVOLUTIONS[6][0])
+	check(game.player.evolutions.has(CrownCatalog.EVOLUTIONS[6][0][0]), "Top-row selection actually evolves player")
+	check(game.active(), "Choosing evolution preserves active combat")
 	game.choices.clear()
 	game.choice_open = false
 	game.ui.modal.hide()
+	game.ui.evolution_panel.hide()
+	game.ui.show_game()
+	# Restart to test all later tiers from a clean evolution chain.
+	game.start_game()
+	p = game.player
+	for i in 24: p.grow_level()
 	for level in [6, 13, 21]:
 		p = CrownCatalog.evolve(p, CrownCatalog.EVOLUTIONS[level][0])
 	check(p == game.player and p.evolutions.size() == 3, "Later evolutions retain the replaced player actor")
@@ -407,13 +420,18 @@ func run() -> void:
 	game.start_game()
 	var investor = game.player
 	check(investor.level == 1 and investor.stat_points == 1, "Lv1 starts with one investable point")
+	game.ui.refresh_growth_panels()
+	check(game.ui.stat_panel.visible and not game.ui.modal.visible, "Unspent points show inline without modal")
+	check(game.ui.stat_rows.size() == 6, "Six stat upgrade rows exist in vertical HUD")
 	check(investor.stat_allocations.size() == 6 and CrownBuilds.MAX_RANK == 8, "Six stats and eight ranks per stat")
 	var base_attack = investor.damage
 	var base_speed = investor.speed
 	var base_stamina = investor.max_stamina
 	var base_armor = investor.armor
 	var base_haste = investor.attack_speed
-	check(CrownBuilds.invest(investor, "health"), "Player can invest initial HP point")
+	game.ui.invest_stat("health")
+	check(investor.stat_allocations["health"] == 1, "Inline plus button path invests without pause")
+	check(game.active() and not game.ui.stat_panel.visible, "Spending last point hides stat HUD and preserves combat")
 	near(investor.max_hp, game.balance.starting_hp + 12, "HP investment adds 12")
 	for i in 24: investor.grow_level()
 	check(investor.level == 25 and investor.stat_points == 24, "Lv25 has 25 lifetime points")
