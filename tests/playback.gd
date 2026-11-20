@@ -4,12 +4,12 @@ func _ready() -> void:
 	call_deferred("run")
 
 func run() -> void:
-	get_tree().get_tree().root.get_node("Meta").muted = true
+	get_tree().root.get_node("Meta").muted = true
 	var game = load("res://scenes/main.tscn").instantiate()
 	game.balance = game.balance.duplicate()
 	game.balance.bot_count = 0
 	game.balance.monster_count = 0
-	get_tree().get_tree().root.add_child(game)
+	get_tree().root.add_child(game)
 	for zone in game.get_node("Zones").get_children(): zone.experience_per_second = 0
 	game.start_game()
 	game.touch_mode = true
