@@ -114,6 +114,7 @@ func show_menu() -> void:
 func show_game() -> void:
 	menu.hide()
 	modal.hide()
+	evolution_panel.hide()
 	hud.show()
 	refresh_growth_panels()
 	touch.clear_input()
@@ -155,6 +156,7 @@ func invest_stat(stat: String) -> void:
 
 func refresh_growth_panels() -> void:
 	if arena == null or not is_instance_valid(arena.player): return
+	if arena.mode != "play": evolution_panel.hide()
 	var f = arena.player
 	var show_stats: bool = arena.mode == "play" and f.alive and f.stat_points > 0
 	stat_panel.visible = show_stats
