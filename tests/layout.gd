@@ -43,10 +43,19 @@ func run() -> void:
 		game.ui.show_shop()
 		await settle()
 		verify(screen.encloses(game.ui.panel.get_global_rect()), "Shop fits " + str(dimensions))
-		game.ui.show_choices({"kind": "evolution", "level": 21})
-		await settle()
-		verify(screen.encloses(game.ui.panel.get_global_rect()), "Evolution modal fits " + str(dimensions))
+		# Non-modal growth elements should stay inside any desktop/phone viewport.
 		game.ui.show_game()
+		player.level = 6
+		game.ui.show_choices({"kind": "evolution", "level": 6})
+		await settle()
+		verify(game.active(), "Evolution does not freeze combat " + str(dimensions))
+		verify(not game.ui.modal.visible, "Evolution never opens fullscreen overlay " + str(dimensions))
+		verify(screen.encloses(game.ui.evolution_panel.get_global_rect()), "Evolution row fits " + str(dimensions))
+		verify(game.ui.evolution_items.get_child_count() == 4, "Four choices in evolution row " + str(dimensions))
+		verify(game.ui.stat_panel.visible, "Unspent stats stay visible " + str(dimensions))
+		verify(screen.encloses(game.ui.stat_panel.get_global_rect()), "Stat rows fit " + str(dimensions))
+		game.ui.evolution_panel.hide()
+		game.choice_open = false
 		game.touch_attack = true
 		game.touch_block = true
 		touch.joystick_id = 2
