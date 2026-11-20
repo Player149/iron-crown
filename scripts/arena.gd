@@ -94,7 +94,7 @@ func start_game(boost: bool = false) -> void:
 	player.position = balance.world_size / 2
 	for i in balance.bot_count:
 		var bot = spawn_fighter(false)
-		for j in randi_range(0, 4): advance_bot(bot)
+		for j in randi_range(0, 4): bot = advance_bot(bot)
 		bot.hp = bot.max_hp
 	for i in balance.monster_count:
 		var monster = MonsterScene.instantiate()
@@ -105,10 +105,8 @@ func start_game(boost: bool = false) -> void:
 		monsters.append(monster)
 	if boost and Meta.boosts > 0:
 		Meta.boosts -= 1
-		for i in 4:
-			player.grow_level()
-			CrownCatalog.apply_stat(player, CrownCatalog.STATS.pick_random()[0])
-		choices.append({"kind": "evolution", "level": 5})
+		for i in 5: player.grow_level()
+		choices.append({"kind": "evolution", "level": 6})
 		player.hp = player.max_hp
 		Meta.save_data()
 	camera.position = player.position
@@ -141,7 +139,8 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 		"groggy", "groggy_decay_left", "groggy_immunity", "dash_left",
 		"dash_velocity", "facing", "evolutions", "class_name_text",
 		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_block",
-		"respawn_timer", "attack_lock", "swing_power", "show_attack_range"
+		"respawn_timer", "attack_lock", "swing_power", "show_attack_range",
+		"stat_points", "stat_allocations", "ai_build", "max_stamina"
 	]
 	for key in state_keys:
 		var value = old_f.get(key)
@@ -181,9 +180,11 @@ func spawn_fighter(human: bool):
 	f.is_player = human
 	f.display_name = Meta.player_name if human else ["회색 늑대", "청동 방패", "별 없는 밤", "랜스롯", "참새 기사", "붉은 장미", "철갑 상어", "달빛 검객", "까마귀", "북풍"].pick_random()
 	f.tint = Color("f4bf59") if human else [Color("66b8de"), Color("dc7589"), Color("a899de"), Color("69c7ab")].pick_random()
+	if not human: f.ai_build = CrownBuilds.random_profile()
 	f.position = random_position()
 	$Actors.add_child(f)
 	fighters.append(f)
+	if not human and mode != "duel": CrownBuilds.allocate_ai(f)
 	return f
 
 ## A self-contained, equal-level fight without XP, monsters, zones or boss events.
@@ -219,7 +220,7 @@ func start_duel(player_class: String = "swordsman", enemy_class: String = "hamme
 	player.facing = 0.0
 	duel_enemy.facing = PI
 	for fighter in fighters:
-		for i in 4: fighter.grow_level()
+		for i in 5: fighter.grow_level()
 		fighter.hp = fighter.max_hp
 		fighter.stamina = fighter.max_stamina
 		fighter.xp = 0.0
@@ -431,16 +432,15 @@ func add_xp(f, amount: float) -> void:
 		if f.is_player:
 			run_gold += roundi((28 + f.level * 5) * f.gold_bonus)
 			if not CrownCatalog.options_for(f, f.level).is_empty(): choices.append({"kind": "evolution", "level": f.level})
-			choices.append({"kind": "stat", "level": f.level})
 			sound("level", f)
 		else:
-			CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
+			CrownBuilds.allocate_ai(f)
 			if not CrownCatalog.options_for(f, f.level).is_empty(): f = CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 	if f.is_player: process_choices()
 
 func advance_bot(f):
 	f.grow_level()
-	CrownCatalog.apply_stat(f, CrownCatalog.STATS.pick_random()[0])
+	CrownBuilds.allocate_ai(f)
 	if not CrownCatalog.options_for(f, f.level).is_empty(): f = CrownCatalog.evolve(f, CrownCatalog.options_for(f, f.level).pick_random())
 	return f
 
