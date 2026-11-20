@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 
 var failures: Array = []
 var assertions: int = 0
@@ -12,15 +12,15 @@ func check(ok: bool, description: String) -> void:
 func near(actual: float, expected: float, description: String) -> void:
 	check(absf(actual - expected) < 0.01, description + " (%s, expected %s)" % [actual, expected])
 
-func _initialize() -> void:
+func _ready() -> void:
 	call_deferred("run")
 
 func run() -> void:
-	var meta = root.get_node("Meta")
+	var meta = get_tree().get_tree().root.get_node("Meta")
 	meta.muted = true
 	meta.equipped = []
 	var game = load("res://scenes/main.tscn").instantiate()
-	root.add_child(game)
+	get_tree().get_tree().root.add_child(game)
 	game.set_physics_process(false)
 	game.start_game()
 	var p = game.player
@@ -50,7 +50,7 @@ func run() -> void:
 	check(p.attack_lock > 0, "Attack startup/recovery action lock")
 	near(attack_target.hp, hp_before_swing, "Attack waits for swing hit timing")
 	p.get_node("AnimationPlayer").advance(0.201)
-	await process_frame
+	await get_tree().process_frame
 	check(p.position.is_equal_approx(Vector2(1000, 1000)), "Attack animation preserves world position")
 	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
 	var stamina_before_dash = p.stamina
@@ -82,14 +82,14 @@ func run() -> void:
 	p.guard.tick(0.15)
 	check(not p.guard.blocking, "Guard state is not driven by timer")
 	guard_player.advance(0.15)
-	await process_frame
+	await get_tree().process_frame
 	check(p.guard.blocking and p.guard.phase == "hold", "Raise animation event activates guard")
 	near(p.guard.perfect_left, game.balance.perfect_guard_window, "Guard starts perfect-block window")
 	p.guard.requested = false
 	p.guard.tick(0.0)
 	check(not p.guard.blocking and p.guard.phase == "lower", "Guard lowering loses protection")
 	guard_player.advance(0.23)
-	await process_frame
+	await get_tree().process_frame
 	check(p.guard.phase == "idle", "Lower animation event restores idle state")
 	var default_windup = game.balance.guard_windup
 	var default_recovery = game.balance.guard_recovery
@@ -99,19 +99,19 @@ func run() -> void:
 	p.guard.tick(0.0)
 	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_raise").length / 0.30, "Custom windup scales animation speed")
 	guard_player.advance(0.29)
-	await process_frame
+	await get_tree().process_frame
 	check(not p.guard.blocking, "Custom windup keeps guard vulnerable")
 	guard_player.advance(0.02)
-	await process_frame
+	await get_tree().process_frame
 	check(p.guard.blocking, "Custom windup animation event enables guard")
 	p.guard.requested = false
 	p.guard.tick(0.0)
 	near(guard_player.get_playing_speed(), guard_player.get_animation("guard_lower").length / 0.40, "Custom recovery scales animation speed")
 	guard_player.advance(0.39)
-	await process_frame
+	await get_tree().process_frame
 	check(p.guard.phase == "lower", "Custom recovery keeps action lock")
 	guard_player.advance(0.02)
-	await process_frame
+	await get_tree().process_frame
 	check(p.guard.phase == "idle", "Custom recovery ends via animation event")
 	game.balance.guard_windup = default_windup
 	game.balance.guard_recovery = default_recovery
@@ -383,7 +383,7 @@ func run() -> void:
 	check(p.cooldown.r > 0 and p.cooldown.q > 0, "Later evolution skills execute")
 	check(game.get_node("Projectiles").get_child_count() == 0, "Skill input waits for animation event")
 	p.ability_players.q.advance(0.201)
-	await process_frame
+	await get_tree().process_frame
 	check(game.get_node("Projectiles").get_child_count() == 12, "Lv25 skill animation event launches projectiles")
 	p.resolve_skill_hit("q")
 	check(game.get_node("Projectiles").get_child_count() == 12, "Repeated event cannot duplicate consumed cast")
@@ -429,6 +429,6 @@ func run() -> void:
 	check(game.mode == "play" and game.monsters.size() == 28, "Standard arena remains available after duel")
 	game.mode = "menu"
 	game.queue_free()
-	await process_frame
+	await get_tree().process_frame
 	print("IRON CROWN: %d assertions, %d failures" % [assertions, failures.size()])
-	quit(0 if failures.is_empty() else 1)
+	get_tree().quit(0 if failures.is_empty() else 1)
