@@ -16,11 +16,11 @@ func _ready() -> void:
 	call_deferred("run")
 
 func run() -> void:
-	var meta = get_tree().get_tree().root.get_node("Meta")
+	var meta = get_tree().root.get_node("Meta")
 	meta.muted = true
 	meta.equipped = []
 	var game = load("res://scenes/main.tscn").instantiate()
-	get_tree().get_tree().root.add_child(game)
+	get_tree().root.add_child(game)
 	game.set_physics_process(false)
 	game.start_game()
 	var p = game.player
