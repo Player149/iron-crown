@@ -6,6 +6,6 @@ script = ExtResource("1")
 id = "swordsman"
 title = "검사"
 description = "검 공격 · 방패 방어"
-unlock_level = 5
+unlock_level = 6
 parent_ids = PackedStringArray("knight")
 evolution_scene = ExtResource("2")
