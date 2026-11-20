@@ -191,7 +191,7 @@ func run() -> void:
 	p.hp = 40
 	p.no_hit_time = 5
 	p.tick(1)
-	near(p.hp, 80, "Peaceful HP regeneration 10% per second")
+	near(p.hp, 40 + p.max_hp * 0.10, "Peaceful HP regeneration 10% per second")
 	p.hp = 50
 	p.combat_left = 5
 	p.groggy_left = 1
