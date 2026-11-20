@@ -6,6 +6,6 @@ script = ExtResource("1")
 id = "shieldbearer"
 title = "방패병"
 description = "방패 타격 · 막기와 완벽 방어"
-unlock_level = 5
+unlock_level = 6
 parent_ids = PackedStringArray("knight")
 evolution_scene = ExtResource("2")
