@@ -403,6 +403,54 @@ func run() -> void:
 	near(p.damage, damage_before, "Boss stats restored")
 	game.paused = false
 	game.boss_finish_pending = false
+	# Level growth is independent of the six investable stats.
+	game.start_game()
+	var investor = game.player
+	check(investor.level == 1 and investor.stat_points == 1, "Lv1 starts with one investable point")
+	check(investor.stat_allocations.size() == 6 and CrownBuilds.MAX_RANK == 8, "Six stats and eight ranks per stat")
+	var base_attack = investor.damage
+	var base_speed = investor.speed
+	var base_stamina = investor.max_stamina
+	var base_armor = investor.armor
+	var base_haste = investor.attack_speed
+	check(CrownBuilds.invest(investor, "health"), "Player can invest initial HP point")
+	near(investor.max_hp, game.balance.starting_hp + 12, "HP investment adds 12")
+	for i in 24: investor.grow_level()
+	check(investor.level == 25 and investor.stat_points == 24, "Lv25 has 25 lifetime points")
+	check(game.balance.xp_needed(24) < 500, "Last-level XP requirement reduced")
+	for i in 7: check(CrownBuilds.invest(investor, "health"), "Can fill HP to rank 8")
+	for i in 8: check(CrownBuilds.invest(investor, "damage"), "Can fill damage to rank 8")
+	for i in 8: check(CrownBuilds.invest(investor, "speed"), "Can fill move speed to rank 8")
+	check(investor.stat_points == 1, "Three completed rank-8 stats leave one point")
+	check(not CrownBuilds.invest(investor, "damage"), "Cannot exceed rank 8")
+	check(not CrownBuilds.invest(investor, "invalid"), "Unknown stats cannot consume points")
+	check(CrownBuilds.invest(investor, "stamina"), "Final leftover point may buy stamina")
+	near(investor.max_stamina, base_stamina + 8, "Stamina investment raises cap by 8")
+	check(investor.stat_points == 0, "All 25 earned points may be spent")
+	check(not CrownBuilds.invest(investor, "armor"), "Spent points cannot be reused")
+	near(investor.damage, base_attack * pow(1.04, 8), "Eight damage ranks apply multiplicatively")
+	near(investor.speed, base_speed * pow(1.03, 8), "Eight speed ranks apply multiplicatively")
+	check(investor.armor == base_armor and investor.attack_speed == base_haste, "Uninvested stats stay at baseline")
+	investor.grow_level()
+	check(investor.level == 25 and investor.stat_points == 0, "No points beyond level cap")
+	var profile_bot = game.fighters[1]
+	check(CrownBuilds.PROFILES.has(profile_bot.ai_build), "Every AI is assigned a valid build style")
+	check(profile_bot.stat_points == 0, "AI automatically spends its available points")
+	var allocated: int = 0
+	for rank in profile_bot.stat_allocations.values(): allocated += int(rank)
+	check(allocated == profile_bot.level, "AI allocates one point per earned level")
+	var profiles_distinct = {}
+	for profile in ["assault", "defense", "charge"]:
+		var bot = game.spawn_fighter(false)
+		bot.ai_build = profile
+		# Discard the initial random-style point only by leaving it invested;
+		# successive choices should still follow the selected profile.
+		for i in 11:
+			bot.grow_level()
+			CrownBuilds.allocate_ai(bot)
+		profiles_distinct[profile] = bot.stat_allocations.duplicate(true)
+	check(profiles_distinct["assault"] != profiles_distinct["defense"], "Assault and defense allocate differently")
+	check(profiles_distinct["charge"] != profiles_distinct["defense"], "Charge and defense allocate differently")
 	# Duel mode: only two equally leveled combatants, no XP or extra arena entities.
 	game.start_duel("spearman", "shieldbearer")
 	check(game.mode == "duel" and game.active(), "Duel becomes active")
