@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 
 var failed = 0
 var checks = 0
@@ -9,23 +9,23 @@ func verify(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 
-func _initialize() -> void:
+func _ready() -> void:
 	call_deferred("run")
 
 func settle() -> void:
-	for i in 5: await process_frame
+	for i in 5: await get_tree().process_frame
 
 func run() -> void:
-	root.get_node("Meta").muted = true
+	get_tree().get_tree().root.get_node("Meta").muted = true
 	var game = load("res://scenes/main.tscn").instantiate()
-	root.add_child(game)
+	get_tree().get_tree().root.add_child(game)
 	game.set_physics_process(false)
 	game.touch_mode = true
 	game.start_game()
 	var player = game.player
 	player.hp = 71
 	for dimensions in [Vector2i(360, 800), Vector2i(390, 844), Vector2i(320, 568), Vector2i(690, 720), Vector2i(844, 390), Vector2i(1152, 648)]:
-		root.size = dimensions
+		get_tree().root.size = dimensions
 		game.ui.refresh_layout(true)
 		await settle()
 		var touch = game.ui.touch
@@ -53,6 +53,6 @@ func run() -> void:
 		game.ui.refresh_layout(true)
 		verify(not game.touch_attack and not game.touch_block and touch.joystick_id == -1, "Rotation clears held input")
 	game.queue_free()
-	await process_frame
+	await get_tree().process_frame
 	print("LAYOUT: %d checks, %d failures" % [checks, failed])
-	quit(0 if failed == 0 else 1)
+	get_tree().quit(0 if failed == 0 else 1)
