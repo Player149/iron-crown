@@ -21,6 +21,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v6
       - name: Install pinned Godot and Web export templates
@@ -37,11 +38,11 @@ jobs:
       - name: Import project
         run: godot --headless --path . --editor --quit
       - name: Verify combat, progression and boss restoration
-        run: godot --headless --path . --script res://tests/run.gd
+        run: timeout 120s godot --headless --path . res://tests/run.tscn
       - name: Verify portrait and landscape layouts
-        run: godot --headless --path . --script res://tests/layout.gd
+        run: timeout 120s godot --headless --path . res://tests/layout.tscn
       - name: Verify moving attacks preserve world position
-        run: godot --headless --path . --script res://tests/playback.gd
+        run: timeout 120s godot --headless --path . res://tests/playback.tscn
       - name: Export Web
         run: |
           mkdir -p build/web
