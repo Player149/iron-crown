@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   GODOT_VERSION: 4.7.2
@@ -39,13 +39,13 @@ jobs:
         run: godot --headless --path . --editor --quit
       - name: Verify combat, progression and boss restoration
         continue-on-error: true
-        run: timeout 45s godot --headless --path . res://tests/run.tscn
+        run: timeout 15s godot --headless --path . res://tests/run.tscn
       - name: Verify portrait and landscape layouts
         continue-on-error: true
-        run: timeout 45s godot --headless --path . res://tests/layout.tscn
+        run: timeout 15s godot --headless --path . res://tests/layout.tscn
       - name: Verify moving attacks preserve world position
         continue-on-error: true
-        run: timeout 45s godot --headless --path . res://tests/playback.tscn
+        run: timeout 15s godot --headless --path . res://tests/playback.tscn
       - name: Export Web
         run: |
           mkdir -p build/web
