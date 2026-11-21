@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://ym6ggymtw685" path="res://scripts/characters/spearman.gd" id="2"]
 [ext_resource type="Resource" path="res://data/characters/templates/spearman.tres" id="3"]
 [ext_resource type="Texture2D" uid="uid://cm3qhp688h417" path="res://assets/Spear.png" id="4"]
-[ext_resource type="Script" path="res://scripts/components/shield_guard.gd" id="5"]
+[ext_resource type="Script" uid="uid://q5ue76w2g2h" path="res://scripts/components/shield_guard.gd" id="5"]
 
 [sub_resource type="Animation" id="Reset"]
 length = 0.001
@@ -31,6 +31,42 @@ tracks/1/keys = {
 "transitions": PackedFloat32Array(1),
 "update": 0,
 "values": [0.0]
+}
+
+[sub_resource type="Animation" id="GuardLower"]
+resource_name = "guard_lower"
+length = 0.16
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Guard")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.159),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"on_guard_lowered"
+}]
+}
+
+[sub_resource type="Animation" id="GuardRaise"]
+resource_name = "guard_raise"
+length = 0.1
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Guard")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.099),
+"transitions": PackedFloat32Array(1),
+"values": [{
+"args": [],
+"method": &"on_guard_raised"
+}]
 }
 
 [sub_resource type="Animation" id="Swing"]
@@ -76,35 +112,13 @@ tracks/2/keys = {
 "values": [0.0, -0.6981317007977318, 0.7347836150896131, 0.0]
 }
 
-[sub_resource type="Animation" id="GuardRaise"]
-resource_name = "guard_raise"
-length = 0.10
-tracks/0/type = "method"
-tracks/0/path = NodePath("Guard")
-tracks/0/keys = {
-"times": PackedFloat32Array(0.099),
-"transitions": PackedFloat32Array(1),
-"values": [{"args": [], "method": &"on_guard_raised"}]
-}
-
-[sub_resource type="Animation" id="GuardLower"]
-resource_name = "guard_lower"
-length = 0.16
-tracks/0/type = "method"
-tracks/0/path = NodePath("Guard")
-tracks/0/keys = {
-"times": PackedFloat32Array(0.159),
-"transitions": PackedFloat32Array(1),
-"values": [{"args": [], "method": &"on_guard_lowered"}]
-}
-
 [sub_resource type="AnimationLibrary" id="Anims"]
 resource_local_to_scene = true
 _data = {
 &"RESET": SubResource("Reset"),
-&"swing": SubResource("Swing"),
+&"guard_lower": SubResource("GuardLower"),
 &"guard_raise": SubResource("GuardRaise"),
-&"guard_lower": SubResource("GuardLower")
+&"swing": SubResource("Swing")
 }
 
 [node name="Spearman" unique_id=1437213972 instance=ExtResource("1")]
@@ -121,7 +135,7 @@ texture = ExtResource("4")
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." index="5" unique_id=961879843]
 libraries/ = SubResource("Anims")
 
-[node name="Guard" type="Node2D" parent="."]
+[node name="Guard" type="Node2D" parent="." index="7" unique_id=1457836250]
 script = ExtResource("5")
-mode = "simple"
 shield_path = NodePath("../Visual/Body")
+mode = "simple"

@@ -1,6 +1,13 @@
 extends Node
 
-var gold: int = 2400
+const STARTING_GOLD := 2400
+const RUNE_CHEST_COST := 800
+const START_TICKET_COST := 1400
+const RUNE_LEVEL_CAP := 5
+const EQUIPPED_RUNE_CAP := 3
+const RUNE_BONUS := {"edge": 0.04, "heart": 0.05, "wind": 0.03, "wisdom": 0.05, "fortune": 0.08}
+
+var gold: int = STARTING_GOLD
 var inventory: Dictionary = {}
 var equipped: Array = []
 var boosts: int = 0
@@ -12,7 +19,7 @@ func _ready() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
-			gold = int(saved.get("gold", 2400))
+			gold = int(saved.get("gold", STARTING_GOLD))
 			inventory = saved.get("inventory", {})
 			equipped = saved.get("equipped", [])
 			boosts = int(saved.get("boosts", 0))
@@ -24,7 +31,7 @@ func _ready() -> void:
 		if raw is String:
 			var saved = JSON.parse_string(raw)
 			if saved is Dictionary:
-				gold = int(saved.get("gold", 2400))
+				gold = int(saved.get("gold", STARTING_GOLD))
 				inventory = saved.get("inventory", {})
 				equipped = saved.get("equipped", [])
 				boosts = int(saved.get("boosts", 0))
@@ -40,9 +47,9 @@ func rune_level(id: String) -> int:
 	return int(inventory.get(id, 0)) if equipped.has(id) else 0
 
 func apply_runes(f) -> void:
-	f.damage *= 1 + 0.04 * rune_level("edge")
-	f.max_hp *= 1 + 0.05 * rune_level("heart")
+	f.damage *= 1 + RUNE_BONUS.edge * rune_level("edge")
+	f.max_hp *= 1 + RUNE_BONUS.heart * rune_level("heart")
 	f.hp = f.max_hp
-	f.speed *= 1 + 0.03 * rune_level("wind")
-	f.xp_gain *= 1 + 0.05 * rune_level("wisdom")
-	f.gold_bonus *= 1 + 0.08 * rune_level("fortune")
+	f.speed *= 1 + RUNE_BONUS.wind * rune_level("wind")
+	f.xp_gain *= 1 + RUNE_BONUS.wisdom * rune_level("wisdom")
+	f.gold_bonus *= 1 + RUNE_BONUS.fortune * rune_level("fortune")

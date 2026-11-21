@@ -40,6 +40,10 @@ var body_scale: float = 1
 var radius: float = 25
 var alive: bool = true
 var kills: int = 0
+var match_slot: int = 0
+var iron_score: int = 0
+var center_score: int = 0
+var coronation_effect: float = 0.0
 var boss_flag: bool = false
 var boss_damage: float = 0
 var boss_kills: int = 0
@@ -69,7 +73,12 @@ var cooldown: Dictionary = {"attack": 0.0, "dash": 0.0, "e": 0.0, "r": 0.0, "q":
 var base_stats: Dictionary
 var ai_target
 var ai_retarget: float = 0
-var ai_block: float = 0
+var ai_retreat_left: float = 0
+var ai_retreat_cooldown: float = 0
+var ai_reaction_left: float = 0.0
+var ai_reacting: bool = false
+var ai_defense_recovery: float = 0.0
+var swing_hit_time: float = -1.0
 var respawn_timer: float = 0
 
 func _ready() -> void:
@@ -85,6 +94,13 @@ func _ready() -> void:
 	$AnimationPlayer.remove_animation_library("")
 	$AnimationPlayer.add_animation_library("", library)
 	if definition.attack_animation != null: library.add_animation("swing", definition.attack_animation)
+	var swing := $AnimationPlayer.get_animation("swing") as Animation
+	for track in swing.get_track_count():
+		if swing.track_get_type(track) != Animation.TYPE_METHOD: continue
+		for index in swing.track_get_key_count(track):
+			if swing.method_track_get_name(track, index) == &"resolve_attack_hit":
+				swing_hit_time = swing.track_get_key_time(track, index)
+				break
 	if definition.ability != null: equip_ability(definition.skill_slot, definition.ability)
 	base_stats = snapshot_stats()
 	if is_player:
@@ -110,6 +126,7 @@ func tick(dt: float) -> void:
 	update_groggy(dt)
 	combat_left = maxf(0, combat_left - dt)
 	no_hit_time += dt
+	ai_defense_recovery = maxf(0.0, ai_defense_recovery - dt)
 	if guard != null: guard.requested = false
 	velocity = Vector2.ZERO
 	if can_act():
@@ -124,10 +141,15 @@ func tick(dt: float) -> void:
 		dash_left -= dt
 		velocity = dash_velocity
 		arena.fx_ring(position, 12, Color("79dbf4") if is_player and Meta.rune_level("frost") > 0 else tint, 0.2)
-	position += velocity * dt
-	var bounds: Rect2 = arena.bounds()
+	var speed_factor := 1.0
+	if dash_left <= 0.0:
+		if coronation_effect > 0.0: speed_factor = arena.coronation_rules.haste_movement
+		elif coronation_effect < 0.0: speed_factor = arena.coronation_rules.slow_movement
+	coronation_effect = move_toward(coronation_effect, 0.0, dt)
+	position += velocity * dt * speed_factor
+	var bounds: Rect2 = arena.fighter_bounds(self)
 	position = position.clamp(bounds.position + Vector2.ONE * 30, bounds.end - Vector2.ONE * 30)
-	if no_hit_time >= arena.balance.regen_delay:
+	if no_hit_time >= arena.balance.regen_delay and (arena.coronation == null or arena.coronation.phase != 2):
 		hp = minf(max_hp, hp + max_hp * arena.balance.health_regen * dt)
 	update_visual()
 
@@ -141,36 +163,166 @@ func player_control() -> void:
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
 	if guard != null: guard.requested = Input.is_action_pressed("block") or arena.touch_block
-	var multiplier = 1.42 if Input.is_action_pressed("run") or arena.touch_run else 1.0
-	if guard_busy(): multiplier *= 0.5
-	elif attack_lock > 0: multiplier *= 0.75
+	var multiplier = arena.balance.sprint_multiplier if Input.is_action_pressed("run") or arena.touch_run else 1.0
+	if guard_busy(): multiplier *= arena.balance.guard_move_multiplier
+	elif attack_lock > 0: multiplier *= arena.balance.swing_move_multiplier
 	velocity = move * speed * multiplier
 	if (not arena.touch_mode and Input.is_action_pressed("attack")) or arena.touch_attack: attack()
 	if Input.is_action_just_pressed("dash"): dash(move)
 	for key in ["e", "r", "q"]:
 		if Input.is_action_just_pressed(key): skill(key)
 
+func clear_match_action() -> void:
+	pass
+
 func ai_control(dt: float) -> void:
+	if arena.coronation != null and dash_left <= 0.0 and arena.coronation.guide(self): return
 	ai_retarget -= dt
-	ai_block = maxf(0, ai_block - dt)
-	if ai_retarget <= 0 or not is_instance_valid(ai_target) or not arena.valid_target(self, ai_target):
-		ai_target = arena.nearest_target(self, 780)
-		ai_retarget = randf_range(0.25, 0.7)
-	if ai_target == null: return
+	ai_retreat_left = maxf(0.0, ai_retreat_left - dt)
+	ai_retreat_cooldown = maxf(0.0, ai_retreat_cooldown - dt)
+	if ai_retarget <= 0.0 or not arena.valid_target(self, ai_target):
+		var previous_target = ai_target
+		ai_target = arena.nearest_target(self, arena.balance.ai_detection_radius)
+		if ai_target != previous_target: ai_reacting = false
+		ai_retarget = arena.balance.ai_retarget_seconds
+	if ai_target == null or dash_left > 0.0:
+		ai_reacting = false
+		if dash_left <= 0.0 and arena.coronation != null: arena.coronation.roam(self)
+		return
+
 	var offset: Vector2 = ai_target.position - position
-	var distance = offset.length()
-	facing = offset.angle()
-	var toward = 1.0 if distance > 92 else (-0.4 if distance < 58 else 0.0)
-	if hp / max_hp < 0.22 and not boss_flag: toward = -0.75
-	if distance < 145 and randf() < dt * 0.7: ai_block = randf_range(0.25, 0.6)
-	if guard != null: guard.requested = ai_block > 0
-	var side = offset.normalized().orthogonal() * sin(float(get_instance_id()) + arena.elapsed * 0.8) * (0.42 if distance < 230 else 0.0)
-	velocity = (offset.normalized() * toward + side) * speed * (0.5 if guard_busy() else 1.0)
-	if distance < attack_reach(): attack()
-	if distance < 430 and randf() < dt * 0.5: skill("e")
-	if distance < 220 and randf() < dt * 0.3: skill("r")
-	if distance < 260 and randf() < dt * 0.18: skill("q")
-	if distance > 210 and distance < 440 and randf() < dt * 0.24: dash(offset.normalized())
+	var distance := offset.length()
+	var direction := offset / maxf(distance, 0.001) if distance > 0.001 else Vector2.from_angle(facing)
+	facing = direction.angle()
+	var reach: float = attack_reach() + ai_target.radius
+	var preferred := ai_preferred_distance(reach)
+	var escape := ai_escape_direction(direction)
+	var vulnerable: bool = ai_target is CrownFighter and not ai_target.can_act()
+	var target_ready := ai_target_is_open()
+	var attack_cost: float = arena.balance.attack_stamina_cost
+	var dash_cost: float = arena.balance.dash_stamina_cost
+
+	if ai_retreat_cooldown <= 0.0 and not vulnerable:
+		if (not boss_flag and hp < max_hp * arena.balance.ai_retreat_hp_ratio and hp < ai_target.hp) or stamina < attack_cost + 5.0:
+			ai_retreat_left = arena.balance.ai_retreat_seconds
+			ai_retreat_cooldown = arena.balance.ai_retreat_cooldown
+	var retreating: bool = ai_retreat_left > 0.0 and not vulnerable
+
+	var move := direction if distance > preferred + 5.0 else Vector2.ZERO
+	if retreating or distance < preferred - 12.0:
+		move = escape
+	velocity = move * speed * (arena.balance.swing_move_multiplier if attack_lock > 0.0 else 1.0)
+
+	var threat := INF
+	if ai_target is CrownFighter:
+		threat = ai_target.ai_threat_time(self)
+	if ai_defend(threat, escape, dt):
+		velocity = move * speed * (arena.balance.guard_move_multiplier if guard_busy() else 1.0)
+		return
+	if guard_busy():
+		velocity *= arena.balance.guard_move_multiplier
+		return
+	if attack_lock > 0.0 or not pending_skills.is_empty(): return
+
+	if ai_use_class_skill(distance, reach, retreating, target_ready): return
+	if retreating:
+		if distance < reach + 20.0 and stamina > dash_cost + 6.0 and escape != Vector2.ZERO:
+			dash(escape)
+		return
+	if not target_ready: return
+
+	for slot in ["q", "r", "e"]:
+		if cooldown[slot] <= 0.0 and abilities.has(slot):
+			var ability: CrownAbility = abilities[slot]
+			if ability.effect == "area" and distance <= ability.radius + ai_target.radius - 12.0:
+				skill(slot)
+				return
+			if ability.effect == "projectiles" and distance <= ai_projectile_range(ability):
+				skill(slot)
+				return
+
+	if distance <= reach - 6.0 and stamina > attack_cost + 3.0:
+		attack()
+	elif cooldown.dash <= 0.0 and stamina > dash_cost + attack_cost + 18.0:
+		# Spend a dash to close a gap that walking cannot cover during an opening.
+		if distance > preferred + 75.0 and distance <= preferred + 135.0:
+			dash(direction)
+
+func ai_preferred_distance(reach: float) -> float:
+	return reach * 0.68
+
+func ai_use_class_skill(_distance: float, _reach: float, _retreating: bool, _target_ready: bool) -> bool:
+	return false
+
+func ai_target_is_open() -> bool:
+	if ai_target.invuln > 0.0: return false
+	var opponent := ai_target as CrownFighter
+	# Pressure a raised barrier so a shieldbearer cannot hold it indefinitely.
+	return opponent == null or not opponent.blocking or opponent.guard.mode == "barrier"
+
+func ai_projectile_range(ability: CrownAbility) -> float:
+	var useful_range := minf(280.0, ability.projectile_speed * ability.projectile_lifetime * 0.7)
+	# An even fan has no shot on the center line, so use it closer to the target.
+	if not ability.radial and ability.projectile_count % 2 == 0 and ability.spread > 0.0:
+		var half_gap := sin(ability.spread * 0.5)
+		useful_range = minf(useful_range, (ai_target.radius + 7.0) / maxf(0.01, half_gap))
+	if ability.radial: useful_range = minf(useful_range, 120.0)
+	return useful_range
+
+func ai_escape_direction(toward: Vector2) -> Vector2:
+	var bounds: Rect2 = arena.fighter_bounds(self).grow(-31.0)
+	if bounds.has_point(position - toward * 85.0): return -toward
+	var tangent := toward.orthogonal()
+	if bounds.has_point(position + tangent * 85.0): return tangent
+	if bounds.has_point(position - tangent * 85.0): return -tangent
+	return position.direction_to(bounds.get_center())
+
+func ai_defend(threat: float, escape: Vector2, dt: float) -> bool:
+	if threat == INF:
+		ai_reacting = false
+		return false
+
+	var facing_player: bool = ai_target.is_player
+	if facing_player and not ai_reacting:
+		ai_reacting = true
+		ai_reaction_left = randf_range(arena.balance.ai_player_reaction_seconds.x, arena.balance.ai_player_reaction_seconds.y)
+	elif facing_player:
+		ai_reaction_left = maxf(0.0, ai_reaction_left - dt)
+	if attack_lock > 0.0 or not pending_skills.is_empty(): return false
+
+	var guard_windup: float = arena.balance.guard_windup
+	var can_guard_hit := false
+	if guard != null:
+		can_guard_hit = guard.meter > 0.0 if guard.mode == "barrier" else stamina > arena.balance.guard_hit_cost + 6.0
+		if can_guard_hit and guard.phase in ["raise", "hold"]:
+			guard.requested = true
+			return true
+
+	# Let the player follow up after a defense. The existing guard can finish normally.
+	if facing_player and (ai_reaction_left > 0.0 or ai_defense_recovery > 0.0): return false
+	if can_guard_hit and guard.phase == "idle":
+		if threat >= guard_windup and threat <= guard_windup + arena.balance.ai_guard_timing_window:
+			guard.requested = true
+			if facing_player: ai_defense_recovery = randf_range(arena.balance.ai_player_defense_recovery.x, arena.balance.ai_player_defense_recovery.y)
+			return true
+		# A late guard read does not turn into an instant dodge against the player.
+		if facing_player: return false
+	if threat <= arena.balance.ai_dodge_timing_window and not guard_busy() and stamina > arena.balance.dash_stamina_cost + 8.0:
+		dash(escape)
+		if dash_left > 0.0:
+			if facing_player: ai_defense_recovery = randf_range(arena.balance.ai_player_defense_recovery.x, arena.balance.ai_player_defense_recovery.y)
+			return true
+	return false
+func ai_threat_time(target: CrownFighter) -> float:
+	if attack_lock <= 0.0 or swing_hit_time < 0.0 or not $AnimationPlayer.is_playing():
+		return INF
+	if $AnimationPlayer.current_animation != "swing": return INF
+	var remaining: float = (swing_hit_time - $AnimationPlayer.current_animation_position) / attack_speed
+	if remaining < 0.0 or remaining > 0.25: return INF
+	var offset := target.position - position
+	if offset.length() > attack_reach() + target.radius + 12.0: return INF
+	if absf(angle_difference(facing, offset.angle())) > attack_arc_radians() * 0.5 + 0.12: return INF
+	return remaining
 
 func can_act() -> bool:
 	return alive and groggy_left <= 0 and exhaustion_left <= 0.0
@@ -248,8 +400,8 @@ func resolve_attack_hit() -> void:
 		var offset: Vector2 = target.position - position
 		if offset.length() < reach + target.radius and (arc >= TAU or absf(angle_difference(facing, offset.angle())) < arc * 0.5):
 			var critical = randf() < crit
-			arena.deal_damage(target, damage * swing_power * (1.7 if critical else 1.0), self)
-			target.position += offset.normalized() * 5
+			arena.deal_damage(target, damage * swing_power * (arena.balance.crit_damage_multiplier if critical else 1.0), self)
+			target.position += offset.normalized() * arena.balance.hit_pushback
 			count += 1
 			if groggy_left > 0 or (attack_target_limit > 0 and count >= attack_target_limit): break
 	arena.add_xp(self, 0.35)
@@ -258,10 +410,10 @@ func dash(direction: Vector2 = Vector2.ZERO) -> void:
 	if not can_act() or cooldown.dash > 0 or attack_lock > 0 or guard_busy(): return
 	if not spend_stamina(arena.balance.dash_stamina_cost): return
 	if direction.length() < 0.1: direction = Vector2.from_angle(facing)
-	dash_left = 0.17
-	dash_velocity = direction.normalized() * 690
-	invuln = 0.22
-	cooldown.dash = 2.15 * dash_mult
+	dash_left = arena.balance.dash_seconds
+	dash_velocity = direction.normalized() * arena.balance.dash_speed
+	invuln = arena.balance.dash_immunity_seconds
+	cooldown.dash = arena.balance.dash_cooldown * dash_mult
 	arena.sound("dash", self)
 
 func equip_ability(slot: String, ability: CrownAbility) -> void:

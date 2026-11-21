@@ -4,6 +4,9 @@ const FighterScene = preload("res://scenes/characters/base_knight.tscn")
 const MonsterScene = preload("res://scenes/monster.tscn")
 const ProjectileScene = preload("res://scenes/projectile.tscn")
 @export var balance: CrownBalance = preload("res://data/balance.tres")
+const CoronationMatch = preload("res://scripts/coronation_match.gd")
+@export var coronation_rules = preload("res://data/coronation_rules.tres")
+var coronation
 var player
 var fighters: Array = []
 var monsters: Array = []
@@ -30,7 +33,6 @@ var boss_finish_pending: bool = false
 var duel_enemy
 var duel_player_class: String = "swordsman"
 var duel_enemy_class: String = "hammerman"
-const DUEL_SIZE := Vector2(900, 540)
 var sounds: Dictionary = {}
 @onready var ui = $UI
 @onready var camera = $Camera2D
@@ -78,12 +80,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			ui.invest_stat(CrownBuilds.ORDER[stat_index])
 			get_viewport().set_input_as_handled()
 	if active() and event.is_action_pressed("level_test") and mode == "play": add_xp(player, balance.xp_needed(player.level) - player.xp + 1)
-	if active() and event.is_action_pressed("boss_test"): start_boss(true)
+	if coronation == null and active() and event.is_action_pressed("boss_test"): start_boss(true)
 
 func active() -> bool:
 	return mode in ["play", "boss", "duel"] and not paused
 
-func start_game(boost: bool = false) -> void:
+func start_coronation() -> void:
+	start_game(false, true)
+
+func clear_coronation() -> void:
+	if coronation == null: return
+	for zone in $Zones.get_children():
+		if zone.has_meta("coronation"):
+			$Zones.remove_child(zone)
+			zone.queue_free()
+		else: zone.show()
+	coronation = null
+
+func start_game(boost: bool = false, use_coronation: bool = false) -> void:
+	clear_coronation()
 	$Zones.show()
 	duel_enemy = null
 	for node in $Actors.get_children():
@@ -103,6 +118,15 @@ func start_game(boost: bool = false) -> void:
 	run_kills = 0
 	revives = 0
 	boss = null
+	if use_coronation:
+		coronation = CoronationMatch.new(self)
+		coronation.setup()
+		player = spawn_fighter(true)
+		for i in balance.bot_count: spawn_fighter(false)
+		camera.position = player.position
+		ui.show_game()
+		ui.notice("영광의 대관", "8분 동안 가장 많은 철혈을 모으세요")
+		return
 	player = spawn_fighter(true)
 	player.position = balance.world_size / 2
 	for i in balance.bot_count:
@@ -151,9 +175,10 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 		"damage_contributors", "combat_left", "no_hit_time", "groggy_left",
 		"groggy", "groggy_decay_left", "groggy_immunity", "dash_left",
 		"dash_velocity", "facing", "evolutions", "class_name_text",
-		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_block",
-		"respawn_timer", "attack_lock", "swing_power", "show_attack_range",
-		"stat_points", "stat_allocations", "ai_build", "max_stamina"
+		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_retreat_left", "ai_retreat_cooldown",
+		"ai_defense_recovery", "respawn_timer", "attack_lock", "swing_power", "show_attack_range",
+		"stat_points", "stat_allocations", "ai_build", "max_stamina",
+		"match_slot", "iron_score", "center_score", "coronation_effect"
 	]
 	for key in state_keys:
 		var value = old_f.get(key)
@@ -189,12 +214,13 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 
 func spawn_fighter(human: bool):
 	var f = FighterScene.instantiate()
+	f.match_slot = fighters.size()
 	f.arena = self
 	f.is_player = human
 	f.display_name = Meta.player_name if human else ["회색 늑대", "청동 방패", "별 없는 밤", "랜스롯", "참새 기사", "붉은 장미", "철갑 상어", "달빛 검객", "까마귀", "북풍"].pick_random()
 	f.tint = Color("f4bf59") if human else [Color("66b8de"), Color("dc7589"), Color("a899de"), Color("69c7ab")].pick_random()
 	if not human: f.ai_build = CrownBuilds.random_profile()
-	f.position = random_position()
+	f.position = coronation.safe_spawn() if coronation != null else random_position()
 	$Actors.add_child(f)
 	fighters.append(f)
 	if not human and mode != "duel": CrownBuilds.allocate_ai(f)
@@ -203,6 +229,7 @@ func spawn_fighter(human: bool):
 ## A self-contained, equal-level fight without XP, monsters, zones or boss events.
 func start_duel(player_class: String = "swordsman", enemy_class: String = "hammerman") -> void:
 	if CrownCatalog.ROSTER.find(player_class) == null or CrownCatalog.ROSTER.find(enemy_class) == null: return
+	clear_coronation()
 	duel_player_class = player_class
 	duel_enemy_class = enemy_class
 	for actor in $Actors.get_children():
@@ -228,12 +255,12 @@ func start_duel(player_class: String = "swordsman", enemy_class: String = "hamme
 		player.set(key, duel_enemy.base_stats[key])
 	player.base_stats = duel_enemy.base_stats.duplicate(true)
 	var center: Vector2 = balance.world_size / 2.0
-	player.position = center + Vector2(-180, 0)
-	duel_enemy.position = center + Vector2(180, 0)
+	player.position = center + Vector2.LEFT * balance.duel_spawn_distance / 2.0
+	duel_enemy.position = center + Vector2.RIGHT * balance.duel_spawn_distance / 2.0
 	player.facing = 0.0
 	duel_enemy.facing = PI
 	for fighter in fighters:
-		for i in 5: fighter.grow_level()
+		for i in maxi(0, balance.duel_level - 1): fighter.grow_level()
 		fighter.hp = fighter.max_hp
 		fighter.stamina = fighter.max_stamina
 		fighter.xp = 0.0
@@ -252,13 +279,21 @@ func start_duel(player_class: String = "swordsman", enemy_class: String = "hamme
 func random_position() -> Vector2:
 	return Vector2(randf_range(100, balance.world_size.x - 100), randf_range(100, balance.world_size.y - 100))
 
+func world_dimensions() -> Vector2:
+	return coronation.world() if coronation != null else balance.world_size
+
 func bounds() -> Rect2:
-	return Rect2(balance.world_size / 2.0 - DUEL_SIZE / 2.0, DUEL_SIZE) if mode == "duel" else (Rect2(500, 250, 2200, 1700) if mode == "boss" else Rect2(Vector2.ZERO, balance.world_size))
+	return Rect2(balance.world_size / 2.0 - balance.duel_size / 2.0, balance.duel_size) if mode == "duel" else (Rect2(500, 250, 2200, 1700) if mode == "boss" else Rect2(Vector2.ZERO, world_dimensions()))
+
+func fighter_bounds(f) -> Rect2:
+	return coronation.combat_bounds(f) if coronation != null else bounds()
 
 func _physics_process(dt: float) -> void:
 	if active():
 		elapsed += dt
-		if mode == "play":
+		if coronation != null:
+			coronation.step(dt)
+		elif mode == "play":
 			boss_countdown -= dt
 			if boss_countdown <= 0: start_boss()
 		elif mode == "boss":
@@ -268,13 +303,21 @@ func _physics_process(dt: float) -> void:
 		for f in fighters.duplicate():
 			if not active(): break
 			if f.alive: f.tick(dt)
+			elif coronation != null:
+				if coronation.phase != 2:
+					f.respawn_timer -= dt
+					if f.respawn_timer <= 0.0: coronation.reset_fighter(f, coronation.safe_spawn(), coronation_rules.spawn_protection)
 			elif not f.is_player and mode == "play":
 				f.respawn_timer -= dt
 				if f.respawn_timer <= 0:
 					fighters.erase(f)
 					f.queue_free()
 					spawn_fighter(false)
-		if mode == "play" and active():
+		if coronation != null and active():
+			if coronation.phase != 2:
+				for m in monsters.duplicate(): m.tick(dt)
+				for f in fighters.duplicate(): coronation.growth(f, dt)
+		elif mode == "play" and active():
 			for m in monsters: m.tick(dt)
 			for f in fighters:
 				if not f.alive: continue
@@ -290,12 +333,19 @@ func _physics_process(dt: float) -> void:
 	effects = effects.filter(func(fx): return fx.life > 0)
 	if is_instance_valid(player):
 		var focus = player if player.alive or boss == null else boss
+		if coronation != null and not player.alive and coronation.phase == 2:
+			for fighter in fighters:
+				if fighter.alive:
+					focus = fighter
+					break
 		camera.position = camera.position.lerp(balance.world_size / 2.0 if mode == "duel" else focus.position, 1 - exp(-8 * dt))
 	ui.update_hud()
 	queue_redraw()
 
 func valid_target(source, target) -> bool:
 	if not is_instance_valid(target) or not target.alive or target == source: return false
+	if coronation != null and coronation.phase == 2:
+		return coronation.bracket.can_target(source, target)
 	if mode == "boss":
 		if not target is CrownFighter or not participants.has(target): return false
 		return target != boss if source == boss else target == boss
@@ -303,7 +353,8 @@ func valid_target(source, target) -> bool:
 
 func targets(source) -> Array:
 	var result = fighters.filter(func(f): return valid_target(source, f))
-	if mode == "play": result.append_array(monsters.filter(func(m): return m.alive))
+	if mode == "play" and (coronation == null or coronation.phase != 2):
+		result.append_array(monsters.filter(func(m): return m.alive))
 	return result
 
 func nearest_target(source, distance: float):
@@ -325,6 +376,9 @@ func nearest_fighter(at: Vector2, distance: float):
 
 func deal_damage(target, amount: float, source) -> float:
 	if not target.alive or target.invuln > 0: return 0
+	if coronation != null and coronation.phase == 2:
+		if not coronation.bracket.can_target(source, target): return 0
+		amount *= coronation.bracket.damage_multiplier()
 	if target is CrownFighter: target.no_hit_time = 0
 	if source is CrownFighter: source.no_hit_time = 0
 	var duel = target is CrownFighter and source is CrownFighter
@@ -346,16 +400,20 @@ func deal_damage(target, amount: float, source) -> float:
 	if duel:
 		# A fully absorbed shield hit is not a damage contribution.
 		target.damage_contributors[source.get_instance_id()] = elapsed
+		if coronation != null: coronation.record_damage(target, source, minf(final, target.hp))
 	target.hp -= final
 	if target is CrownFighter and target.hp > 0 and not was_blocking:
 		target.add_groggy(balance.groggy_hit)
 	if source is CrownFighter:
 		source.hp = minf(source.max_hp, source.hp + final * source.lifesteal)
-		add_xp(source, minf(2, final * 0.028))
+		add_xp(source, minf(balance.hit_xp_cap, final * balance.hit_xp_per_damage))
 		if mode == "boss" and target == boss: source.boss_damage += final
 	float_text(target.position, str(roundi(final)), Color("f6d8da"))
 	if source == player or target == player: sound("hit", player)
-	if target.hp <= 0: kill_target(target, source)
+	if target.hp <= 0:
+		if is_instance_valid(source) and source.has_meta("evolution_replacement"):
+			source = source.get_meta("evolution_replacement")
+		kill_target(target, source)
 	return final
 
 func recent_contributor_count(victim) -> int:
@@ -373,6 +431,9 @@ func kill_target(target, killer) -> void:
 	target.respawn_timer = randf_range(5, 9)
 	fx_ring(target.position, 70, Color("ff627f"), 0.5)
 	if not target is CrownFighter:
+		if coronation != null:
+			coronation.on_monster_death(target, killer)
+			return
 		target.respawn_timer = randf_range(8, 14)
 		if killer is CrownFighter: add_xp(killer, 48 if target.brute else 28)
 		return
@@ -387,10 +448,12 @@ func kill_target(target, killer) -> void:
 			boss.boss_kills += 1
 			if participants.filter(func(f): return f != boss and f.alive).is_empty(): finish_boss(false)
 		return
+	if coronation != null: coronation.on_knockout(target, killer)
 	if killer is CrownFighter:
 		var contributor_count = recent_contributor_count(target)
 		killer.kills += 1
-		add_xp(killer, 110 + target.level * 25)
+		var kill_xp: float = balance.xp_needed(killer.level) * coronation_rules.kill_level_fraction if coronation != null else 110.0 + target.level * 25.0
+		add_xp(killer, kill_xp)
 		# XP can evolve an AI on the killing hit; reward its replacement.
 		if killer.has_meta("evolution_replacement"):
 			killer = killer.get_meta("evolution_replacement")
@@ -405,10 +468,10 @@ func kill_target(target, killer) -> void:
 		float_text(killer.position, "완전 회복!" if contributor_count == 1 else "체력 회복 (기여자 %d명)" % contributor_count, Color("7be2b0"))
 		if killer.is_player:
 			run_kills += 1
-			run_gold += roundi((70 + target.level * 20) * killer.gold_bonus)
+			run_gold += roundi((balance.kill_gold_base + target.level * balance.kill_gold_per_level) * killer.gold_bonus)
 		ui.feed("%s → %s" % [killer.display_name, target.display_name])
 	if target is CrownFighter: target.damage_contributors.clear()
-	if target == player:
+	if target == player and coronation == null:
 		mode = "gameover"
 		choice_open = false
 		bank_gold()
@@ -443,7 +506,7 @@ func add_xp(f, amount: float) -> void:
 		f.xp -= balance.xp_needed(f.level)
 		f.grow_level()
 		if f.is_player:
-			run_gold += roundi((28 + f.level * 5) * f.gold_bonus)
+			run_gold += roundi((balance.level_gold_base + f.level * balance.level_gold_per_level) * f.gold_bonus)
 			if not CrownCatalog.options_for(f, f.level).is_empty(): choices.append({"kind": "evolution", "level": f.level})
 			sound("level", f)
 		else:
@@ -463,7 +526,7 @@ func process_choices() -> void:
 	ui.show_choices(choices.pop_front())
 
 func start_boss(manual: bool = false) -> void:
-	if mode != "play" or choice_open or paused: return
+	if coronation != null or mode != "play" or choice_open or paused: return
 	participants = fighters.filter(func(f): return f.alive and f.level >= 10)
 	if manual and player.level >= 10 and participants.size() < 2:
 		for f in fighters:
@@ -541,8 +604,8 @@ func bank_gold() -> void:
 	Meta.save_data()
 
 func revive() -> void:
-	if mode != "gameover" or revives >= 3: return
-	var cost = [800, 1800, 4000][revives]
+	if mode != "gameover" or revives >= balance.revive_costs.size(): return
+	var cost = balance.revive_costs[revives]
 	if Meta.gold < cost: return
 	Meta.gold -= cost
 	Meta.save_data()
@@ -555,14 +618,15 @@ func revive() -> void:
 	player.stamina = player.max_stamina
 	player.exhaustion_left = 0.0
 	player.damage_contributors.clear()
-	player.invuln = 3
+	player.invuln = balance.revive_immunity
 	player.position = balance.world_size / 2
 	mode = "play"
 	ui.show_game()
 	process_choices()
 
 func return_menu() -> void:
-	if mode not in ["duel", "duel_result"]: bank_gold()
+	clear_coronation()
+	if mode not in ["duel", "duel_result"] and run_gold > 0: bank_gold()
 	duel_enemy = null
 	$Zones.show()
 	mode = "menu"
@@ -590,8 +654,10 @@ func fx_ring(at: Vector2, radius: float, color: Color, life: float) -> void:
 func _draw() -> void:
 	var rect = bounds()
 	draw_rect(rect, Color("1d1420") if mode == "boss" else Color("12232d"))
-	for x in range(0, int(balance.world_size.x), 80): draw_line(Vector2(x, 0), Vector2(x, balance.world_size.y), Color(0.3, 0.5, 0.6, 0.07))
-	for y in range(0, int(balance.world_size.y), 80): draw_line(Vector2(0, y), Vector2(balance.world_size.x, y), Color(0.3, 0.5, 0.6, 0.07))
+	var world := world_dimensions()
+	for x in range(0, int(world.x), 80): draw_line(Vector2(x, 0), Vector2(x, world.y), Color(0.3, 0.5, 0.6, 0.07))
+	for y in range(0, int(world.y), 80): draw_line(Vector2(0, y), Vector2(world.x, y), Color(0.3, 0.5, 0.6, 0.07))
+	if coronation != null: coronation.draw_map(self, Vector2.ONE)
 	draw_rect(rect, Color("81506b") if mode == "boss" else Color("425769"), false, 5)
 	for fx in effects:
 		var color = Color(fx.color, fx.life / fx.max)

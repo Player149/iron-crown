@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="CrownCoronationRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/coronation_rules.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+match_seconds = 480.0
+map_side = 5340.0
+shrink_starts = Vector3(95.0, 155.0, 215.0)
+shrink_ends = Vector3(120.0, 180.0, 240.0)
+shrink_radii = Vector3(2900.0, 2200.0, 1450.0)
+hazard_interval = 0.5
+hazard_hp_fraction = 0.10
+zone_ai_margin = 95.0
+ring_side = 510.0
+ring_gap = 120.0
+bout_seconds = 13.0
+round_break_seconds = 1.25
+final_break_seconds = 3.0
+bout_spawn_separation = 150.0
+bout_spawn_protection = 0.45
+bout_damage_multiplier = 1.25
+bout_damage_ramp = 0.60
+bout_ramp_start = 0.6
+kill_score = 1000
+assist_max_ratio = 0.5
+assist_window = 5.0
+champion_score = 2000
+field_score = 400
+brute_score = 200
+roamer_score = 100
+passive_level_seconds = 32.0
+zone_level_seconds = 20.0
+kill_level_fraction = 0.65
+field_level_fraction = 0.70
+brute_level_fraction = 0.42
+roamer_level_fraction = 0.24
+field_heal = 0.25
+roamer_heal = 0.12
+haste_seconds = 8.0
+haste_movement = 1.15
+slow_seconds = 2.0
+slow_movement = 0.80
+xp_zone_radius = 195.0
+monster_field_radius = 235.0
+site_jitter = 250.0
+site_center_clearance = 610.0
+roaming_monster_offset = 340.0
+roaming_monster_leash = 260.0
+roaming_brute_chance = 0.25
+field_respawn = 28.0
+roamer_respawn = 14.0
+resource_count = 50
+resource_interval = 1.5
+resource_hp = Vector3(72.0, 48.0, 24.0)
+resource_level_fractions = Vector3(0.28, 0.18, 0.10)
+terrain_mark_count = 420
+spawn_attempts = 70
+spawn_border = 130.0
+center_spawn_clearance = 440.0
+site_spawn_margin = 90.0
+fighter_spawn_clearance = 320.0
+roamer_spawn_clearance = 230.0
+resource_spawn_clearance = 85.0
+fighter_respawn = 4.0
+spawn_protection = 2.0
+ai_roam_period = 16.0

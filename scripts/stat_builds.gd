@@ -5,6 +5,14 @@ extends RefCounted
 ## At Lv.25 players earn 25 points: three fully maxed stats and one spare.
 const MAX_RANK: int = 8
 const ORDER := ["health", "damage", "speed", "stamina", "armor", "haste"]
+const INVESTMENT := {
+	"health": 12.0,
+	"damage": 1.04,
+	"speed": 1.03,
+	"stamina": 8.0,
+	"armor": 3.0,
+	"haste": 1.03
+}
 const STAT_INFO := {
 	"health": ["체력", "최대 체력 +12"],
 	"damage": ["공격력", "공격력 +4%"],
@@ -46,15 +54,15 @@ static func invest(f, stat: String) -> bool:
 	f.stat_allocations[stat] = int(f.stat_allocations.get(stat, 0)) + 1
 	match stat:
 		"health":
-			f.max_hp += 12.0
-			f.hp = minf(f.max_hp, f.hp + 12.0)
-		"damage": f.damage *= 1.04
-		"speed": f.speed *= 1.03
+			f.max_hp += INVESTMENT[stat]
+			f.hp = minf(f.max_hp, f.hp + INVESTMENT[stat])
+		"damage": f.damage *= INVESTMENT[stat]
+		"speed": f.speed *= INVESTMENT[stat]
 		"stamina":
-			f.max_stamina += 8.0
-			f.stamina = minf(f.max_stamina, f.stamina + 8.0)
-		"armor": f.armor += 3.0
-		"haste": f.attack_speed *= 1.03
+			f.max_stamina += INVESTMENT[stat]
+			f.stamina = minf(f.max_stamina, f.stamina + INVESTMENT[stat])
+		"armor": f.armor += INVESTMENT[stat]
+		"haste": f.attack_speed *= INVESTMENT[stat]
 	f.update_visual()
 	return true
 

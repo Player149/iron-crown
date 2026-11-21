@@ -25,7 +25,9 @@ func _ready() -> void:
 		Meta.player_name = box.get_node("Name").text.strip_edges().left(12)
 		if Meta.player_name.is_empty(): Meta.player_name = "방랑 기사"
 		Meta.save_data()
-		arena.start_game(box.get_node("Boost").button_pressed))
+		arena.start_coronation())
+	box.get_node("Start").text = "영광의 대관 · 8분 데스매치"
+	box.get_node("Tags").text = "철혈 순위전  /  중앙 결전  /  최대 Lv.25"
 	box.get_node("Shop").pressed.connect(show_shop)
 	var duel_button := Button.new()
 	duel_button.name = "DuelTest"
@@ -107,9 +109,7 @@ func show_menu() -> void:
 	touch.hide()
 	box.get_node("Name").text = Meta.player_name
 	box.get_node("Gold").text = "보유 골드 %d   ·   장착 룬 %d/3" % [Meta.gold, Meta.equipped.size()]
-	box.get_node("Boost").text = "Lv.6 시작권 사용 (%d개)" % Meta.boosts
-	box.get_node("Boost").disabled = Meta.boosts <= 0
-	if Meta.boosts <= 0: box.get_node("Boost").button_pressed = false
+	box.get_node("Boost").hide()
 
 func show_game() -> void:
 	menu.hide()
@@ -232,7 +232,10 @@ func show_pause(open: bool) -> void:
 	if not open:
 		modal.hide()
 		return
-	clear_modal("잠시 쉬어가기", "1대1 테스트 · 같은 레벨의 AI와 대전 중" if arena.mode == "duel" else "L: 레벨업 테스트 · B: 보스전 테스트 (Lv.10 이상)")
+	var details := "L: 레벨업 테스트 · B: 보스전 테스트 (Lv.10 이상)"
+	if arena.mode == "duel": details = "1대1 테스트 · 같은 레벨의 AI와 대전 중"
+	elif arena.coronation != null: details = "영광의 대관 · 8분 동안 철혈 순위 경쟁"
+	clear_modal("잠시 쉬어가기", details)
 	add_button("계속하기", func():
 		arena.paused = false
 		modal.hide()
@@ -248,6 +251,15 @@ func show_pause(open: bool) -> void:
 			show_duel_select())
 	add_button("메뉴로 돌아가기", arena.return_menu)
 
+func show_coronation_result(ranking: Array) -> void:
+	var winner = ranking[0]
+	var placement := ranking.find(arena.player) + 1
+	clear_modal("철의 왕관 · %s" % winner.display_name, "내 순위 %d위 · 철혈 %d" % [placement, arena.player.iron_score])
+	for i in mini(5, ranking.size()):
+		add_label("%d위  %s   철혈 %d" % [i + 1, ranking[i].display_name, ranking[i].iron_score])
+	add_button("영광의 대관 다시 시작", arena.start_coronation)
+	add_button("메뉴로", arena.return_menu)
+
 func show_result(title: String, details: String) -> void:
 	clear_modal(title, details)
 	add_button("전장으로 돌아가기", func():
@@ -257,9 +269,9 @@ func show_result(title: String, details: String) -> void:
 
 func show_gameover() -> void:
 	clear_modal("왕관을 놓쳤습니다", "Lv.%d  /  처치 %d  /  생존 %s\n획득 골드는 보관되었습니다" % [arena.player.level, arena.run_kills, time_text(arena.elapsed)])
-	if arena.revives < 3:
-		var cost = [800, 1800, 4000][arena.revives]
-		var b = add_button("%d 골드 · 부활 (%d/3)" % [cost, arena.revives], arena.revive)
+	if arena.revives < arena.balance.revive_costs.size():
+		var cost = arena.balance.revive_costs[arena.revives]
+		var b = add_button("%d 골드 · 부활 (%d/%d)" % [cost, arena.revives, arena.balance.revive_costs.size()], arena.revive)
 		b.disabled = Meta.gold < cost
 	add_button("메뉴로", arena.return_menu)
 
@@ -267,21 +279,21 @@ func show_shop(message: String = "") -> void:
 	clear_modal("룬 · 장비 보관함", "보유 %d 골드 · 최대 3개 장착 · 룬 최대 Lv.5" % Meta.gold)
 	var row = VBoxContainer.new()
 	panel.add_child(row)
-	add_button("룬 상자 · 800", func():
-		if Meta.gold < 800:
+	add_button("룬 상자 · %d" % Meta.RUNE_CHEST_COST, func():
+		if Meta.gold < Meta.RUNE_CHEST_COST:
 			show_shop("골드가 부족합니다")
 			return
-		Meta.gold -= 800
+		Meta.gold -= Meta.RUNE_CHEST_COST
 		var rune = CrownCatalog.RUNES.pick_random()
-		Meta.inventory[rune[0]] = mini(5, int(Meta.inventory.get(rune[0], 0)) + 1)
-		if Meta.equipped.size() < 3 and not Meta.equipped.has(rune[0]): Meta.equipped.append(rune[0])
+		Meta.inventory[rune[0]] = mini(Meta.RUNE_LEVEL_CAP, int(Meta.inventory.get(rune[0], 0)) + 1)
+		if Meta.equipped.size() < Meta.EQUIPPED_RUNE_CAP and not Meta.equipped.has(rune[0]): Meta.equipped.append(rune[0])
 		Meta.save_data()
 		show_shop("%s Lv.%d 획득" % [rune[1], Meta.inventory[rune[0]]]), row)
-	add_button("Lv.6 시작권 · 1400", func():
-		if Meta.gold < 1400:
+	add_button("Lv.6 시작권 · %d" % Meta.START_TICKET_COST, func():
+		if Meta.gold < Meta.START_TICKET_COST:
 			show_shop("골드가 부족합니다")
 			return
-		Meta.gold -= 1400
+		Meta.gold -= Meta.START_TICKET_COST
 		Meta.boosts += 1
 		Meta.save_data()
 		show_shop("시작권 획득"), row)
@@ -299,9 +311,9 @@ func show_shop(message: String = "") -> void:
 		var label = "%s · Lv.%d · %s\n%s" % [rune[1], owned, "장착 중" if Meta.equipped.has(id) else "미장착", rune[2]]
 		var b = add_button(label, func():
 			if Meta.equipped.has(id): Meta.equipped.erase(id)
-			elif Meta.equipped.size() < 3: Meta.equipped.append(id)
+			elif Meta.equipped.size() < Meta.EQUIPPED_RUNE_CAP: Meta.equipped.append(id)
 			else:
-				show_shop("룬은 최대 3개까지 장착할 수 있습니다")
+				show_shop("룬은 최대 %d개까지 장착할 수 있습니다" % Meta.EQUIPPED_RUNE_CAP)
 				return
 			Meta.save_data()
 			show_shop(), items)
@@ -333,6 +345,28 @@ func update_hud() -> void:
 	var rank_text = "ARENA RANKING\n"
 	for f in ranking.slice(0, 5): rank_text += "%s%s Lv.%d\n" % [f.display_name, "" if f.is_player else " [%s]" % CrownBuilds.profile_title(f.ai_build), f.level]
 	hud.get_node("Leaderboard").text = "1 VS 1 · %s" % time_text(arena.elapsed) if arena.mode in ["duel", "duel_result"] else rank_text
+	if arena.coronation != null:
+		var match_data = arena.coronation
+		var phase_text: String = ["전장 성장", "중앙으로 이동", "중앙 결전", "막판 순위 경쟁"][match_data.phase]
+		if match_data.phase == 2:
+			var bracket = match_data.bracket
+			var bout_left := ceili(maxf(0.0, bracket.deadline - arena.elapsed))
+			phase_text = "%d라운드 · 대진 종료" % bracket.round_number if bracket.next_round_at >= 0.0 else "%d라운드 · 대진 %d초" % [bracket.round_number, bout_left]
+		if match_data.phase == 1 and p.position.distance_to(arena.world_dimensions() / 2.0) > match_data.safe_radius():
+			var direction: Vector2 = arena.world_dimensions() / 2.0 - p.position
+			var compass := ["동", "남동", "남", "남서", "서", "북서", "북", "북동"]
+			phase_text = "위험 구역 · %s쪽으로" % compass[posmod(roundi(direction.angle() / (PI / 4.0)), 8)]
+		hud.get_node("Boss").text = "%s · %s\n철혈 %d" % [phase_text, time_text(ceili(match_data.rules.match_seconds - arena.elapsed)), p.iron_score]
+		var leaders := "철혈 순위\n"
+		for f in match_data.ranking().slice(0, 5):
+			leaders += "%s  %d\n" % [f.display_name, f.iron_score]
+		hud.get_node("Leaderboard").text = leaders
+		if not p.alive:
+			hud.get_node("Info/Status").text = ("다음 라운드 대기" if p.match_slot in match_data.bracket.advancing and not match_data.winner_announced else "중앙 토너먼트 관전 중") if match_data.phase == 2 else "부활까지 %.1f초" % maxf(0.0, p.respawn_timer)
+		elif p.coronation_effect > 0.0:
+			hud.get_node("Info/Status").text = "가속 %.1f초" % p.coronation_effect
+		elif p.coronation_effect < 0.0:
+			hud.get_node("Info/Status").text = "둔화 %.1f초" % -p.coronation_effect
 	var slots = ["평타", "대시", "E", "R", "Q"]
 	var keys = ["attack", "dash", "e", "r", "q"]
 	for i in 5:
