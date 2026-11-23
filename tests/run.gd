@@ -145,8 +145,21 @@ func run() -> void:
 	game.deal_damage(p, 1, enemy)
 	near(enemy.groggy, 60, "Perfect guard adds 60 groggy to attacker")
 	near(p.guard.perfect_left, 0, "Perfect guard can trigger once per raise")
+	near(p.guard.parry_cooldown_left, 4.0, "Successful parry starts a four-second cooldown")
+	p.guard.reset()
+	p.guard.requested = true
+	p.guard.phase = "raise"
+	p.guard.on_guard_raised()
+	near(p.guard.perfect_left, 0, "Re-raising cannot bypass parry cooldown")
+	check(p.guard.blocking, "Normal guard remains available during parry cooldown")
 	game.deal_damage(p, 1, enemy)
-	near(enemy.groggy, 60, "Repeated hit in same hold does not duplicate parry")
+	near(enemy.groggy, 60, "Guard during cooldown does not parry")
+	p.guard.reset()
+	p.guard.tick(4.0)
+	p.guard.requested = true
+	p.guard.phase = "raise"
+	p.guard.on_guard_raised()
+	near(p.guard.perfect_left, game.balance.perfect_guard_window, "Parry returns after four seconds")
 	p.guard.phase = "idle"
 	p.guard.blocking = false
 	p.invuln = 1
@@ -349,10 +362,24 @@ func run() -> void:
 			actor.stamina = 50.0
 			var barrier_stamina = actor.stamina
 			var barrier_hp = actor.hp
+			victim.stamina = victim.max_stamina
 			game.deal_damage(actor, 30.0, victim)
+			near(victim.stamina, victim.max_stamina - game.balance.attack_stamina_cost * game.balance.blocked_attack_stamina_multiplier, "Barrier drains attacker stamina")
 			near(actor.hp, barrier_hp, "Barrier negates incoming damage")
 			near(actor.stamina, barrier_stamina, "Barrier consumes no stamina when hit")
 			near(actor.guard.meter, 70.0, "Barrier meter loses incoming damage")
+			actor.guard.requested = true
+			actor.guard.tick(0.5)
+			near(actor.stamina, barrier_stamina - game.balance.guard_drain_per_second * 0.25, "Barrier hold drains half the timed guard rate")
+			game.deal_damage(actor, 70.0, victim)
+			near(actor.hp, barrier_hp, "Hit that breaks the barrier is fully absorbed")
+			check(not actor.guard.blocking, "Empty barrier lowers the shield")
+			actor.guard.reset()
+			actor.guard.requested = true
+			actor.guard.tick(2.99)
+			check(actor.guard.meter > 0.0 and actor.guard.phase == "idle", "Regenerated durability cannot bypass the break lock")
+			actor.guard.tick(0.02)
+			check(actor.guard.phase == "raise", "Barrier can raise again after three seconds")
 			actor.guard.reset()
 			var old_damage = actor.damage
 			actor.skill("e")

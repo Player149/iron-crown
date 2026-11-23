@@ -8,7 +8,13 @@ extends Node2D
 ## Barrier-only pool; a full hit is absorbed if the pool had any durability.
 @export var meter_max: float = 100.0
 @export var meter_regen: float = 12.0
+const BARRIER_BREAK_DURATION: float = 3.0
+const BARRIER_DRAIN_MULTIPLIER: float = 0.5
+const PARRY_COOLDOWN: float = 4.0
+
 var meter: float = 100.0
+var barrier_break_left: float = 0.0
+var parry_cooldown_left: float = 0.0
 var requested: bool = false
 var phase: String = "idle"
 var blocking: bool = false
@@ -26,9 +32,14 @@ func _ready() -> void:
 	animator.animation_finished.connect(_on_animation_finished)
 
 func is_busy() -> bool:
-	return phase != "idle" or requested
+	return phase != "idle" or (requested and can_raise())
+
+func can_raise() -> bool:
+	return mode != "barrier" or (meter > 0.0 and barrier_break_left <= 0.0)
 
 func tick(dt: float) -> void:
+	barrier_break_left = maxf(0.0, barrier_break_left - dt)
+	parry_cooldown_left = maxf(0.0, parry_cooldown_left - dt)
 	if not fighter.can_act():
 		reset()
 		return
@@ -40,14 +51,16 @@ func tick(dt: float) -> void:
 		if fallback_left <= 0.0:
 			if phase == "raise": on_guard_raised()
 			elif phase == "lower": on_guard_lowered()
-	if phase == "idle" and requested and (mode != "barrier" or meter > 0.0) and fighter.attack_lock <= 0 and fighter.dash_left <= 0:
+	if phase == "idle" and requested and can_raise() and fighter.attack_lock <= 0 and fighter.dash_left <= 0:
 		phase = "raise"
 		play_transition(raise_animation, fighter.arena.balance.guard_windup)
 	elif phase == "hold":
 		if not requested:
 			lower()
-		elif mode != "barrier":
-			fighter.stamina = maxf(0.0, fighter.stamina - fighter.arena.balance.guard_drain_per_second * dt)
+		else:
+			var drain: float = fighter.arena.balance.guard_drain_per_second
+			if mode == "barrier": drain *= BARRIER_DRAIN_MULTIPLIER
+			fighter.stamina = maxf(0.0, fighter.stamina - drain * dt)
 			if fighter.stamina <= 0.0: fighter.trigger_exhaustion()
 	update_visual()
 
@@ -64,7 +77,8 @@ func on_guard_raised() -> void:
 	using_fallback = false
 	phase = "hold"
 	blocking = true
-	perfect_left = fighter.arena.balance.perfect_guard_window
+	if mode == "timed" and parry_cooldown_left <= 0.0:
+		perfect_left = fighter.arena.balance.perfect_guard_window
 	if not requested: lower()
 
 func on_guard_lowered() -> void:
@@ -100,7 +114,7 @@ func reset() -> void:
 
 func absorb_hit() -> bool:
 	if not fighter.can_act() or not blocking or phase != "hold": return false
-	if mode == "barrier": return meter > 0.0
+	if mode == "barrier": return can_raise()
 	if not fighter.spend_stamina(fighter.arena.balance.guard_hit_cost):
 		if fighter.exhaustion_left <= 0.0: lower()
 		return false
@@ -108,23 +122,26 @@ func absorb_hit() -> bool:
 
 ## Returns -1 for an unblocked hit, otherwise the shield damage reduction.
 func receive_hit(source, incoming_damage: float = 0.0) -> float:
-	var perfect = mode == "timed" and blocking and phase == "hold" and perfect_left > 0.0
+	var perfect = mode == "timed" and blocking and phase == "hold" and perfect_left > 0.0 and parry_cooldown_left <= 0.0
 	if not absorb_hit(): return -1.0
 	var arena = fighter.arena
 	arena.fx_ring(fighter.position, 45, Color("91dfff"), 0.2)
-	if mode == "barrier":
-		meter = maxf(0.0, meter - maxf(0.0, incoming_damage))
-		if meter <= 0.0: lower()
-		update_visual()
-		return 1.0
-	if mode == "timed" and source is CrownFighter:
+	if mode != "simple" and source is CrownFighter:
 		source.stamina = maxf(0.0, source.stamina - arena.balance.attack_stamina_cost * arena.balance.blocked_attack_stamina_multiplier)
 		if source.stamina <= 0.0: source.trigger_exhaustion()
 		if perfect:
 			perfect_left = 0.0
+			parry_cooldown_left = PARRY_COOLDOWN
 			source.add_groggy(arena.balance.perfect_guard_groggy)
 			arena.float_text(fighter.position, "완벽 방어!", Color("f2d47c"))
 			arena.fx_ring(fighter.position, 62, Color("ffd877"), 0.25)
+	if mode == "barrier":
+		meter = maxf(0.0, meter - maxf(0.0, incoming_damage))
+		if meter <= 0.0:
+			barrier_break_left = BARRIER_BREAK_DURATION
+			lower()
+		update_visual()
+		return 1.0
 	return fighter.block_reduction
 
 func update_visual() -> void:
