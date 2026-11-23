@@ -2,17 +2,20 @@ class_name CrownCoronationRules
 extends Resource
 
 @export_group("Match and zone")
+## Total deathmatch time, excluding tournament rounds.
 @export var match_seconds := 480.0
 @export var map_side := 5340.0
-## Start and finish seconds of the three contractions, in chronological order.
-@export var shrink_starts := Vector3(95.0, 155.0, 215.0)
-@export var shrink_ends := Vector3(120.0, 180.0, 240.0)
-@export var shrink_radii := Vector3(2900.0, 2200.0, 1450.0)
+## Stage start times are measured from the start of the match.
+@export var opening_contractions: Array[CrownZoneContraction] = []
+## Stage start times are measured from the end of the first tournament.
+@export var closing_contractions: Array[CrownZoneContraction] = []
 @export var hazard_interval := 0.5
 @export var hazard_hp_fraction := 0.10
 @export var zone_ai_margin := 95.0
 
 @export_group("Tournament")
+## Fallback start when no opening contractions are configured.
+@export var first_tournament_seconds := 240.0
 @export var ring_side := 510.0
 @export var ring_gap := 120.0
 @export var bout_seconds := 13.0
@@ -72,4 +75,15 @@ extends Resource
 @export var fighter_respawn := 4.0
 @export var spawn_protection := 2.0
 @export var ai_roam_period := 16.0
+
+func first_tournament_start_seconds() -> float:
+	if opening_contractions.is_empty():
+		return first_tournament_seconds
+	return contraction_end_seconds(opening_contractions)
+
+func contraction_end_seconds(schedule: Array[CrownZoneContraction]) -> float:
+	var finish_at := 0.0
+	for contraction in schedule:
+		finish_at = maxf(finish_at, contraction.start_seconds + contraction.duration_seconds)
+	return finish_at
 

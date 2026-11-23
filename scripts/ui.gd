@@ -28,7 +28,7 @@ func _ready() -> void:
 		if Meta.player_name.is_empty(): Meta.player_name = "방랑 기사"
 		Meta.save_data()
 		arena.start_coronation())
-	box.get_node("Start").text = "영광의 대관 · 8분 데스매치"
+	box.get_node("Start").text = "영광의 대관 · 데스매치"
 	box.get_node("Tags").text = "철혈 순위전  /  중앙 결전  /  최대 Lv.25"
 	box.get_node("Shop").pressed.connect(show_shop)
 	var duel_button := Button.new()
@@ -60,6 +60,7 @@ func _ready() -> void:
 		row.add_child(add)
 		stat_items.add_child(row)
 		stat_rows[stat] = {"row": row, "label": label, "button": add}
+	hud.get_node("FastForward").pressed.connect(func(): arena.toggle_coronation_fast_forward())
 	hud.get_node("Pause").pressed.connect(func():
 		if arena.choice_open: return
 		arena.paused = true
@@ -107,6 +108,7 @@ func _process(dt: float) -> void:
 	touch.arena = arena
 	touch.visible = arena.active() and arena.touch_mode
 	if not arena.active(): touch.clear_input()
+	if hud.visible: update_hud()
 
 
 func show_menu() -> void:
@@ -294,7 +296,7 @@ func show_pause(open: bool) -> void:
 		return
 	var details := "L: 레벨업 테스트 · B: 보스전 테스트 (Lv.10 이상)"
 	if arena.mode == "duel": details = "1대1 테스트 · 같은 레벨의 AI와 대전 중"
-	elif arena.coronation != null: details = "영광의 대관 · 8분 동안 철혈 순위 경쟁"
+	elif arena.coronation != null: details = "영광의 대관 · 철혈 순위 경쟁"
 	clear_modal("잠시 쉬어가기", details)
 	add_button("계속하기", func():
 		arena.paused = false
@@ -382,6 +384,9 @@ func show_shop(message: String = "") -> void:
 
 func update_hud() -> void:
 	if arena == null or not is_instance_valid(arena.player): return
+	var fast_forward: Button = hud.get_node("FastForward")
+	fast_forward.visible = arena.coronation != null and arena.active()
+	fast_forward.text = "1× 되돌리기" if arena.coronation_fast_forward else "%d× 빨리감기" % arena.CORONATION_FAST_FORWARD_RATE
 	var p = arena.player
 	hud.get_node("Info/Name").text = "%s · Lv.%d · SP %d" % [p.display_name, p.level, p.stat_points]
 	refresh_growth_panels()
@@ -407,16 +412,17 @@ func update_hud() -> void:
 	hud.get_node("Leaderboard").text = "1 VS 1 · %s" % time_text(arena.elapsed) if arena.mode in ["duel", "duel_result"] else rank_text
 	if arena.coronation != null:
 		var match_data = arena.coronation
-		var phase_text: String = ["전장 성장", "중앙으로 이동", "중앙 결전", "막판 순위 경쟁"][match_data.phase]
+		var phase_text: String = ["전장 성장", "중앙으로 이동", "중앙 결전"][match_data.phase]
 		if match_data.phase == 2:
 			var bracket = match_data.bracket
-			var bout_left := ceili(maxf(0.0, bracket.deadline - arena.elapsed))
-			phase_text = "%d라운드 · 대진 종료" % bracket.round_number if bracket.next_round_at >= 0.0 else "%d라운드 · 대진 %d초" % [bracket.round_number, bout_left]
+			var title := "최종전" if match_data.final_tournament else "1차전"
+			phase_text = "%s · %dR" % [title, bracket.round_number]
 		if match_data.phase == 1 and p.position.distance_to(arena.world_dimensions() / 2.0) > match_data.safe_radius():
 			var direction: Vector2 = arena.world_dimensions() / 2.0 - p.position
 			var compass := ["동", "남동", "남", "남서", "서", "북서", "북", "북동"]
 			phase_text = "위험 구역 · %s쪽으로" % compass[posmod(roundi(direction.angle() / (PI / 4.0)), 8)]
-		hud.get_node("Boss").text = "%s · %s\n철혈 %d" % [phase_text, time_text(ceili(match_data.rules.match_seconds - arena.elapsed)), p.iron_score]
+		var match_clock := time_text(ceili(maxf(0.0, match_data.rules.match_seconds - arena.elapsed)))
+		hud.get_node("Boss").text = "%s\n%s · 철혈 %d" % [match_clock, phase_text, p.iron_score]
 		var leaders := "철혈 순위\n"
 		for f in match_data.ranking().slice(0, 5):
 			leaders += "%s  %d\n" % [f.display_name, f.iron_score]
@@ -467,6 +473,7 @@ Shift 달리기 · Space 대시 · E/R/Q 기술
 모바일: 조이스틱 + 전투 버튼 / 세로·가로 자동 전환"
 	place_hud("Info", Rect2(16, 16, 240 if compact else 282, 172))
 	place_hud("Pause", Rect2(width - 112, 16, 96, 48))
+	place_hud("FastForward", Rect2(width - 146, 72, 130, 44) if compact else Rect2(width - 250, 16, 130, 48))
 	# Keep stats beneath health bars and away from the center of combat.
 	var stats_width: float = 166 if compact else 198
 	var stat_y: float = 196

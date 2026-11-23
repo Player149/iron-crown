@@ -18,10 +18,7 @@ func start() -> void:
 	for f in match_data.arena.fighters:
 		slots.append(f.match_slot)
 	slots.shuffle()
-	var rounds := maxi(1, ceili(log(float(maxi(2, slots.size()))) / log(2.0)))
-	var rules = match_data.rules
-	var available: float = rules.match_seconds - match_data.arena.elapsed - rules.final_break_seconds
-	round_seconds = maxf(1.0, minf(rules.bout_seconds, available / rounds - rules.round_break_seconds))
+	round_seconds = maxf(1.0, match_data.rules.bout_seconds)
 	start_round(slots)
 
 func start_round(slots: Array[int]) -> void:
@@ -39,7 +36,7 @@ func start_round(slots: Array[int]) -> void:
 		advancing.append(slots.pop_back())
 	round_number += 1
 	next_round_at = -1.0
-	deadline = game.elapsed + round_seconds
+	deadline = match_data.tournament_elapsed + round_seconds
 	var count := floori(slots.size() / 2.0)
 	var columns := ceili(sqrt(float(count)))
 	var rows := ceili(float(count) / columns)
@@ -81,7 +78,7 @@ func record_damage(source, amount: float) -> void:
 
 func damage_multiplier() -> float:
 	var rules = match_data.rules
-	var progress := clampf(1.0 - (deadline - match_data.arena.elapsed) / round_seconds, 0.0, 1.0)
+	var progress := clampf(1.0 - (deadline - match_data.tournament_elapsed) / round_seconds, 0.0, 1.0)
 	var ramp := clampf((progress - rules.bout_ramp_start) / maxf(0.01, 1.0 - rules.bout_ramp_start), 0.0, 1.0)
 	return rules.bout_damage_multiplier + ramp * rules.bout_damage_ramp
 
@@ -98,16 +95,16 @@ func complete(pair: Dictionary, winner: int) -> void:
 		f.alive = false
 		f.hide()
 	if pairs.all(func(entry): return entry.done):
-		next_round_at = match_data.arena.elapsed + match_data.rules.round_break_seconds
+		next_round_at = match_data.tournament_elapsed + match_data.rules.round_break_seconds
 
 func step() -> void:
 	if match_data.winner_announced: return
 	if next_round_at >= 0.0:
-		if match_data.arena.elapsed >= next_round_at:
+		if match_data.tournament_elapsed >= next_round_at:
 			var slots := advancing.duplicate()
 			start_round(slots)
 		return
-	if match_data.arena.elapsed < deadline: return
+	if match_data.tournament_elapsed < deadline: return
 	for pair in pairs:
 		if pair.done: continue
 		var a = fighter(pair.a)

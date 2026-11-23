@@ -143,6 +143,11 @@ offset_right = -18.0
 offset_top = 12.0
 offset_bottom = 48.0
 text = "일시정지"
+[node name="FastForward" type="Button" parent="Root/HUD"]
+visible = false
+text = "16× 빨리감기"
+tooltip_text = "경기 속도 전환 (F4)"
+
 [node name="Notice" type="Label" parent="Root/HUD"]
 layout_mode = 1
 anchor_left = 0.5

@@ -11,7 +11,16 @@ var player
 var fighters: Array = []
 var monsters: Array = []
 var mode: String = "menu"
-var paused: bool = false
+const CORONATION_FAST_FORWARD_RATE: int = 16
+var coronation_fast_forward: bool = false
+var normal_time_scale: float = Engine.time_scale
+var normal_physics_rate: int = Engine.physics_ticks_per_second
+var normal_physics_step_limit: int = Engine.max_physics_steps_per_frame
+var fast_forward_clock_active: bool = false
+var paused: bool = false:
+	set(value):
+		paused = value
+		update_coronation_clock()
 var elapsed: float = 0
 var boss_countdown: float = 300
 var boss_timer: float = 0
@@ -36,6 +45,32 @@ var duel_enemy_class: String = "hammerman"
 var sounds: Dictionary = {}
 @onready var ui = $UI
 @onready var camera = $Camera2D
+
+func _exit_tree() -> void:
+	coronation_fast_forward = false
+	update_coronation_clock()
+
+func toggle_coronation_fast_forward() -> void:
+	if not active() or coronation == null: return
+	coronation_fast_forward = not coronation_fast_forward
+	update_coronation_clock()
+
+func update_coronation_clock() -> void:
+	var accelerate := coronation_fast_forward and coronation != null and mode == "play" and not paused
+	if accelerate == fast_forward_clock_active: return
+	fast_forward_clock_active = accelerate
+	if accelerate:
+		normal_time_scale = Engine.time_scale
+		normal_physics_rate = Engine.physics_ticks_per_second
+		normal_physics_step_limit = Engine.max_physics_steps_per_frame
+		# Raise both rates to preserve the simulated duration of each combat step.
+		Engine.physics_ticks_per_second = normal_physics_rate * CORONATION_FAST_FORWARD_RATE
+		Engine.max_physics_steps_per_frame = maxi(normal_physics_step_limit, CORONATION_FAST_FORWARD_RATE * 4)
+		Engine.time_scale = normal_time_scale * CORONATION_FAST_FORWARD_RATE
+	else:
+		Engine.time_scale = normal_time_scale
+		Engine.physics_ticks_per_second = normal_physics_rate
+		Engine.max_physics_steps_per_frame = normal_physics_step_limit
 
 func _ready() -> void:
 	setup_input()
@@ -63,6 +98,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if active() and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
 		player.show_attack_range = not player.show_attack_range
 		player.queue_redraw()
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F4:
+		if active() and coronation != null:
+			toggle_coronation_fast_forward()
+			get_viewport().set_input_as_handled()
 	if event.is_action_pressed("pause") and mode in ["play", "boss", "duel"]:
 		paused = not paused
 		ui.show_pause(paused)
@@ -96,6 +135,8 @@ func clear_coronation() -> void:
 			zone.queue_free()
 		else: zone.show()
 	coronation = null
+	coronation_fast_forward = false
+	update_coronation_clock()
 
 func start_game(boost: bool = false, use_coronation: bool = false) -> void:
 	clear_coronation()
@@ -125,7 +166,7 @@ func start_game(boost: bool = false, use_coronation: bool = false) -> void:
 		for i in balance.bot_count: spawn_fighter(false)
 		camera.position = player.position
 		ui.show_game()
-		ui.notice("영광의 대관", "8분 동안 가장 많은 철혈을 모으세요")
+		ui.notice("영광의 대관", "최종 토너먼트까지 가장 많은 철혈을 모으세요")
 		return
 	player = spawn_fighter(true)
 	player.position = balance.world_size / 2
@@ -290,7 +331,8 @@ func fighter_bounds(f) -> Rect2:
 
 func _physics_process(dt: float) -> void:
 	if active():
-		elapsed += dt
+		if coronation == null or coronation.phase != 2:
+			elapsed += dt
 		if coronation != null:
 			coronation.step(dt)
 		elif mode == "play":
@@ -339,8 +381,10 @@ func _physics_process(dt: float) -> void:
 					focus = fighter
 					break
 		camera.position = camera.position.lerp(balance.world_size / 2.0 if mode == "duel" else focus.position, 1 - exp(-8 * dt))
-	ui.update_hud()
 	queue_redraw()
+
+func combat_clock() -> float:
+	return coronation.combat_clock() if coronation != null else elapsed
 
 func valid_target(source, target) -> bool:
 	if not is_instance_valid(target) or not target.alive or target == source: return false
@@ -403,7 +447,7 @@ func deal_damage(target, amount: float, source, direction_to_hit: Vector2 = Vect
 	var final = maxf(1, amount * (1 - reduction))
 	if duel:
 		# A fully absorbed shield hit is not a damage contribution.
-		target.damage_contributors[source.get_instance_id()] = elapsed
+		target.damage_contributors[source.get_instance_id()] = combat_clock()
 		if coronation != null: coronation.record_damage(target, source, minf(final, target.hp))
 	target.hp -= final
 	if target is CrownFighter and target.hp > 0 and not was_blocking:
@@ -424,7 +468,7 @@ func recent_contributor_count(victim) -> int:
 	if not victim is CrownFighter: return 1
 	var count = 0
 	for timestamp in victim.damage_contributors.values():
-		if elapsed - float(timestamp) <= balance.combat_duration: count += 1
+		if combat_clock() - float(timestamp) <= balance.combat_duration: count += 1
 	return maxi(1, count)
 
 func kill_target(target, killer) -> void:

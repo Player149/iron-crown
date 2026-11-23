@@ -17,6 +17,9 @@ var winner_announced := false
 var resource_clock := 0.0
 var hazard_clock := 0.0
 var reopen_at := 0.0
+var tournament_elapsed := 0.0
+var after_first_tournament := false
+var final_tournament := false
 
 func _init(game) -> void:
 	arena = game
@@ -97,39 +100,55 @@ func safe_spawn() -> Vector2:
 
 func safe_radius() -> float:
 	var previous := world().length() * 0.5
-	var columns := ceili(sqrt(ceilf(arena.fighters.size() / 2.0)))
-	var footprint: float = (columns * (rules.ring_side + rules.ring_gap) - rules.ring_gap) / sqrt(2.0)
-	for i in 3:
-		var radius: float = minf(previous, maxf(rules.shrink_radii[i], footprint))
-		var start: float = rules.shrink_starts[i]
-		var finish_at: float = rules.shrink_ends[i]
-		if arena.elapsed < finish_at:
-			return lerpf(previous, radius, clampf((arena.elapsed - start) / maxf(0.01, finish_at - start), 0.0, 1.0))
+	if after_first_tournament and not rules.opening_contractions.is_empty():
+		previous = minf(previous, rules.opening_contractions[0].target_radius)
+	var schedule_elapsed := contraction_elapsed()
+	for contraction in contractions():
+		var radius := minf(previous, contraction.target_radius)
+		var progress := clampf((schedule_elapsed - contraction.start_seconds) / maxf(0.01, contraction.duration_seconds), 0.0, 1.0)
+		if progress < 1.0:
+			return lerpf(previous, radius, progress)
 		previous = radius
 	return previous
 
+func contractions() -> Array[CrownZoneContraction]:
+	return rules.closing_contractions if after_first_tournament else rules.opening_contractions
+
+func contraction_elapsed() -> float:
+	return arena.elapsed - rules.first_tournament_start_seconds() if after_first_tournament else arena.elapsed
+
 func stage() -> int:
-	for i in range(2, -1, -1):
-		if arena.elapsed >= rules.shrink_starts[i]: return i
+	var schedule := contractions()
+	var schedule_elapsed := contraction_elapsed()
+	for i in range(schedule.size() - 1, -1, -1):
+		if schedule_elapsed >= schedule[i].start_seconds: return i
 	return -1
 
 func step(dt: float) -> void:
-	if arena.elapsed >= rules.match_seconds:
-		finish()
-		return
-	if phase <= 1:
-		var current := stage()
-		if current > last_stage:
-			phase = 1
-			last_stage = current
-			arena.ui.notice("%d차 안전 구역 수축" % (current + 1), "경계를 확인하고 중앙으로 이동하세요")
-		if arena.elapsed >= rules.shrink_ends.z:
-			phase = 2
-			bracket = Bracket.new(self)
-			bracket.start()
 	if phase == 2:
+		tournament_elapsed += dt
 		bracket.step()
-		if winner_announced and arena.elapsed >= reopen_at: reopen()
+		if winner_announced and tournament_elapsed >= reopen_at:
+			if final_tournament: finish()
+			else: reopen()
+		return
+
+	var first_start: float = rules.first_tournament_start_seconds()
+	if not after_first_tournament and arena.elapsed >= first_start:
+		arena.elapsed = first_start
+		start_tournament(false)
+		return
+	if after_first_tournament and arena.elapsed >= rules.match_seconds:
+		arena.elapsed = rules.match_seconds
+		start_tournament(true)
+		return
+
+	var current := stage()
+	if current > last_stage:
+		phase = 1
+		last_stage = current
+		var contraction_number := current + (2 if after_first_tournament else 1)
+		arena.ui.notice("%d차 안전 구역 수축" % contraction_number, "경계를 확인하고 중앙으로 이동하세요")
 	if phase == 1:
 		hazard_clock += dt
 		if hazard_clock >= rules.hazard_interval:
@@ -137,16 +156,23 @@ func step(dt: float) -> void:
 			for f in arena.fighters:
 				if f.alive and f.position.distance_to(world() / 2.0) > safe_radius():
 					arena.deal_damage(f, f.max_hp * rules.hazard_hp_fraction, null)
-	if phase == 2: return
 	resource_clock += dt
 	if resource_clock >= rules.resource_interval:
 		resource_clock = 0.0
 		var count: int = arena.monsters.filter(func(m): return m.is_resource() and m.alive).size()
 		if count < rules.resource_count: spawn_resource()
 
+func start_tournament(is_final: bool) -> void:
+	phase = 2
+	final_tournament = is_final
+	tournament_elapsed = 0.0
+	winner_announced = false
+	bracket = Bracket.new(self)
+	bracket.start()
+
 func crown_winner(winner) -> void:
 	winner_announced = true
-	reopen_at = arena.elapsed + rules.final_break_seconds
+	reopen_at = tournament_elapsed + rules.final_break_seconds
 	winner.iron_score += rules.champion_score
 	arena.ui.notice("%s · 중앙 토너먼트 우승" % winner.display_name, "철혈 +%d" % rules.champion_score)
 
@@ -157,7 +183,10 @@ func combat_bounds(f) -> Rect2:
 	return arena.bounds()
 
 func reopen() -> void:
-	phase = 3
+	after_first_tournament = true
+	last_stage = -1
+	hazard_clock = 0.0
+	phase = 1
 	arena.clear_projectiles()
 	var entrants: Array = arena.fighters.duplicate()
 	entrants.shuffle()
@@ -192,17 +221,20 @@ func reset_fighter(f, position: Vector2, protection: float) -> void:
 	f.alive = true
 	f.show()
 
+func combat_clock() -> float:
+	return tournament_elapsed if phase == 2 else arena.elapsed
+
 func record_damage(target, source, amount: float) -> void:
 	if phase == 2: bracket.record_damage(source, amount)
 	var victim: Dictionary = contributions.get_or_add(target.match_slot, {})
 	var entry: Dictionary = victim.get_or_add(source.match_slot, {"samples": [], "damage": 0.0})
 	prune_damage(entry)
-	entry.samples.append(Vector2(arena.elapsed, amount))
+	entry.samples.append(Vector2(combat_clock(), amount))
 	entry.damage += amount
 
 func prune_damage(entry: Dictionary) -> void:
 	var samples: Array = entry.samples
-	while not samples.is_empty() and arena.elapsed - samples[0].x > rules.assist_window:
+	while not samples.is_empty() and combat_clock() - samples[0].x > rules.assist_window:
 		entry.damage -= samples.pop_front().y
 
 func on_knockout(target, killer) -> void:
@@ -248,7 +280,6 @@ func on_monster_death(monster, killer) -> void:
 	arena.add_xp(killer, arena.balance.xp_needed(killer.level) * fraction)
 
 func finish() -> void:
-	arena.elapsed = rules.match_seconds
 	arena.mode = "coronation_result"
 	arena.paused = true
 	if arena.run_gold > 0: arena.bank_gold()

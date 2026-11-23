@@ -1,14 +1,46 @@
-[gd_resource type="Resource" script_class="CrownCoronationRules" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CrownCoronationRules" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/coronation_rules.gd" id="1"]
+
+[ext_resource type="Script" path="res://scripts/zone_contraction.gd" id="2"]
+
+[sub_resource type="Resource" id="OpeningFirst"]
+script = ExtResource("2")
+start_seconds = 120.0
+duration_seconds = 25.0
+target_radius = 2900.0
+
+[sub_resource type="Resource" id="OpeningSecond"]
+script = ExtResource("2")
+start_seconds = 180.0
+duration_seconds = 25.0
+target_radius = 2200.0
+
+[sub_resource type="Resource" id="OpeningThird"]
+script = ExtResource("2")
+start_seconds = 215.0
+duration_seconds = 25.0
+target_radius = 1450.0
+
+[sub_resource type="Resource" id="ClosingSecond"]
+script = ExtResource("2")
+start_seconds = 120.0
+duration_seconds = 25.0
+target_radius = 2200.0
+
+[sub_resource type="Resource" id="ClosingThird"]
+script = ExtResource("2")
+start_seconds = 180.0
+duration_seconds = 25.0
+target_radius = 1450.0
 
 [resource]
 script = ExtResource("1")
 match_seconds = 480.0
 map_side = 5340.0
-shrink_starts = Vector3(95.0, 155.0, 215.0)
-shrink_ends = Vector3(120.0, 180.0, 240.0)
-shrink_radii = Vector3(2900.0, 2200.0, 1450.0)
+opening_contractions = Array[ExtResource("2")]([SubResource("OpeningFirst"), SubResource("OpeningSecond"), SubResource("OpeningThird")])
+closing_contractions = Array[ExtResource("2")]([SubResource("ClosingSecond"), SubResource("ClosingThird")])
+first_tournament_seconds = 240.0
 hazard_interval = 0.5
 hazard_hp_fraction = 0.10
 zone_ai_margin = 95.0
