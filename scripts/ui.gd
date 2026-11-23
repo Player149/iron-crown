@@ -9,6 +9,8 @@ var last_touch_mode: bool = false
 var compact: bool = false
 var stat_rows: Dictionary = {}
 var evolution_choice_count: int = 0
+var balance_lab_running := false
+var balance_lab_status: Label
 @onready var stat_panel: PanelContainer = $Root/HUD/StatPanel
 @onready var stat_items: VBoxContainer = $Root/HUD/StatPanel/Items
 @onready var evolution_panel: PanelContainer = $Root/HUD/EvolutionPanel
@@ -36,6 +38,13 @@ func _ready() -> void:
 	box.add_child(duel_button)
 	box.move_child(duel_button, box.get_node("Shop").get_index())
 	duel_button.pressed.connect(show_duel_select)
+	var lab_button := Button.new()
+	lab_button.name = "BalanceLab"
+	lab_button.text = "AI 자동 전투 · 밸런스 실험실"
+	lab_button.custom_minimum_size = Vector2(0, 50)
+	box.add_child(lab_button)
+	box.move_child(lab_button, box.get_node("Shop").get_index())
+	lab_button.pressed.connect(show_balance_lab)
 	# Build small click targets inside the editor-authored HUD panel.
 	for i in CrownBuilds.ORDER.size():
 		var stat: String = CrownBuilds.ORDER[i]
@@ -205,6 +214,57 @@ func select_evolution(selected: Array) -> void:
 	arena.choice_open = false
 	refresh_growth_panels()
 	arena.process_choices()
+
+## Developer tool: run the real fighter AI in batches from the shipped menu.
+func show_balance_lab() -> void:
+	if balance_lab_running: return
+	clear_modal("AI 전투 밸런스 실험실", "4직업 자동 교차전 · 경기별 기록 누적 · 결과 CSV 집계")
+	add_label("데이터는 user://combat_stats/ 에 저장됩니다.\n에디터/PC에서는 재실행해도 누적되며, 웹에서는 브라우저별로 저장됩니다.", 15)
+	for rounds in [10, 100, 1000]:
+		var requested: int = rounds
+		add_button("%d판 자동 실행" % rounds, func(): start_balance_lab(requested))
+	add_button("메인 메뉴", show_menu)
+
+func start_balance_lab(rounds: int) -> void:
+	if balance_lab_running: return
+	balance_lab_running = true
+	var runner = load("res://tests/balance_lab.gd").new()
+	runner.embedded = true
+	arena.add_child(runner)
+	runner.batch_progress.connect(func(completed: int, total: int):
+		if not balance_lab_running: return
+		# start_duel resets the normal HUD/modal, so restore the lab overlay.
+		if balance_lab_status == null or not is_instance_valid(balance_lab_status) or not modal.visible:
+			clear_modal("AI 자동 전투 실행 중", "실제 AI 판단·공격 판정을 사용해 전투를 빠르게 계산합니다.")
+			balance_lab_status = add_label("", 20)
+		if is_instance_valid(balance_lab_status):
+			balance_lab_status.text = "%d / %d 경기 완료 (%.0f%%)" % [completed, total, 100.0 * completed / maxi(1, total)]
+	)
+	runner.batch_finished.connect(func(records: Array, saved: bool):
+		balance_lab_running = false
+		balance_lab_status = null
+		show_balance_results(records, saved)
+	)
+	runner.run_embedded(arena, rounds)
+
+func show_balance_results(records: Array, saved: bool) -> void:
+	var wins: Dictionary = {}
+	var decided := 0
+	var timeouts := 0
+	for entry in records:
+		var winner: String = str(entry.get("winner_class", ""))
+		if winner.is_empty():
+			timeouts += 1
+			continue
+		wins[winner] = int(wins.get(winner, 0)) + 1
+		decided += 1
+	clear_modal("AI 대전 %d판 종료" % records.size(), "데이터 저장: %s · 승부 결정 %d · 제한시간 종료 %d" % ["완료" if saved else "실패", decided, timeouts])
+	var labels: Dictionary = {"swordsman": "검사", "spearman": "창병", "hammerman": "망치병", "shieldbearer": "방패병"}
+	for id in ["swordsman", "spearman", "hammerman", "shieldbearer"]:
+		add_label("%s: %d승" % [labels[id], int(wins.get(id, 0))], 17)
+	add_label("누적 상세 기록: user://combat_stats/matches.jsonl\n상성별 집계: user://combat_stats/summary.csv", 14)
+	add_button("다시 실험하기", show_balance_lab)
+	add_button("메인 메뉴", show_menu)
 
 func show_duel_select(player_pick: String = "", enemy_pick: String = "") -> void:
 	if player_pick.is_empty():
