@@ -1,7 +1,7 @@
 extends Node
 
 signal batch_progress(completed: int, total: int)
-signal batch_finished(records: Array, saved: bool)
+signal batch_finished(records: Array, failures: int)
 var embedded := false
 var host_game
 var previous_mute := false
@@ -11,9 +11,6 @@ var previous_equipped: Array = []
 ## Uses the real arena, fighter AI, character scenes, attacks and hit callbacks.
 
 const CLASSES := ["swordsman", "spearman", "hammerman", "shieldbearer"]
-const OUTPUT_DIR := "user://combat_stats"
-const MATCHES_FILE := OUTPUT_DIR + "/matches.jsonl"
-const SUMMARY_FILE := OUTPUT_DIR + "/summary.csv"
 const DEFAULT_RUNS := 20
 const MAX_RUNS := 10000
 const MAX_DUEL_SECONDS := 60.0
@@ -116,7 +113,6 @@ func run_batch() -> void:
 			"recorded_at_utc": Time.get_datetime_string_from_system(true),
 			"mode": "ai_duel",
 			"match_index": i,
-			"balance_hash": str(FileAccess.get_file_as_string("res://data/balance.tres").hash()),
 			"seed": match_seed,
 			"side_a_class": left_class,
 			"side_b_class": right_class,
@@ -144,79 +140,39 @@ func run_batch() -> void:
 		if embedded: batch_progress.emit(i + 1, requested_runs)
 		if i % 10 == 0 or i == requested_runs - 1:
 			print("BALANCE LAB %d/%d, %s vs %s: %s" % [i + 1, requested_runs, left_class, right_class, outcome])
-	var saved := append_results(results)
-	if saved:
-		saved = write_summary() and saved
-	print("BALANCE LAB: %d matches, %d initialization failures; persisted=%s" % [results.size(), failures, saved])
-	print("BALANCE LAB: %s" % ProjectSettings.globalize_path(MATCHES_FILE))
-	print("BALANCE LAB: %s" % ProjectSettings.globalize_path(SUMMARY_FILE))
 	Meta.muted = previous_mute
 	Meta.equipped = previous_equipped
 	if embedded:
 		game.return_menu()
 		game.set_physics_process(true)
-		batch_finished.emit(results.duplicate(true), saved and failures == 0)
+		batch_finished.emit(results, failures)
 		game = null
 		queue_free()
 	else:
+		print(format_report(results))
 		game.queue_free()
 		await get_tree().process_frame
-		get_tree().quit(0 if saved and failures == 0 else 1)
+		get_tree().quit(0 if failures == 0 else 1)
 
-func append_results(records: Array[Dictionary]) -> bool:
-	var absolute_dir := ProjectSettings.globalize_path(OUTPUT_DIR)
-	if DirAccess.make_dir_recursive_absolute(absolute_dir) != OK:
-		push_error("Cannot create battle history folder: " + absolute_dir)
-		return false
-	var file := FileAccess.open(MATCHES_FILE, FileAccess.READ_WRITE)
-	if file == null:
-		# READ_WRITE requires an existing file on some platforms.
-		file = FileAccess.open(MATCHES_FILE, FileAccess.WRITE)
-	if file == null:
-		push_error("Cannot open battle history: %s" % FileAccess.get_open_error())
-		return false
-	file.seek_end()
+const CLASS_NAMES := {"swordsman": "검사", "spearman": "창병", "hammerman": "망치병", "shieldbearer": "방패병"}
+
+static func format_report(records: Array) -> String:
+	var matchups := {}
+	var matches := PackedStringArray()
 	for record in records:
-		file.store_line(JSON.stringify(record))
-	file.flush()
-	file.close()
-	return true
-
-func write_summary() -> bool:
-	# Aggregate ALL saved matches, not only this batch. Timeouts are a separate result.
-	var history := FileAccess.open(MATCHES_FILE, FileAccess.READ)
-	if history == null: return false
-	var groups: Dictionary = {}
-	while not history.eof_reached():
-		var line := history.get_line().strip_edges()
-		if line.is_empty(): continue
-		var record = JSON.parse_string(line)
-		if not record is Dictionary or record.get("mode", "") != "ai_duel": continue
-		var a: String = str(record.get("side_a_class", ""))
-		var b: String = str(record.get("side_b_class", ""))
-		for side in ["left", "right"]:
-			var own: String = a if side == "left" else b
-			var other: String = b if side == "left" else a
-			var key := "%s|%s" % [own, other]
-			if not groups.has(key):
-				groups[key] = {"class": own, "opponent": other, "matches": 0, "wins": 0, "losses": 0, "timeouts": 0, "duration_total": 0.0}
-			var group: Dictionary = groups[key]
-			group.matches += 1
-			group.duration_total += float(record.get("duration_seconds", 0.0))
-			if record.outcome == "timeout": group.timeouts += 1
-			elif record.outcome == side: group.wins += 1
-			else: group.losses += 1
-	history.close()
-	var output := FileAccess.open(SUMMARY_FILE, FileAccess.WRITE)
-	if output == null: return false
-	output.store_line("class,opponent,matches,wins,losses,timeouts,decisive_win_rate,average_seconds")
-	var keys := groups.keys()
-	keys.sort()
-	for key in keys:
-		var g: Dictionary = groups[key]
-		var decided: int = g.wins + g.losses
-		var rate: float = float(g.wins) / decided if decided > 0 else 0.0
-		output.store_line("%s,%s,%d,%d,%d,%d,%.4f,%.2f" % [g["class"], g.opponent, g.matches, g.wins, g.losses, g.timeouts, rate, g.duration_total / g.matches])
-	output.flush()
-	output.close()
-	return true
+		var left: String = CLASS_NAMES[record.side_a_class]
+		var right: String = CLASS_NAMES[record.side_b_class]
+		var key := "%s vs %s" % [left, right]
+		var totals: Dictionary = matchups.get_or_add(key, {"left": 0, "right": 0, "timeout": 0, "seconds": 0.0})
+		totals[record.outcome] += 1
+		totals.seconds += record.duration_seconds
+		var result: String = {"left": "왼쪽 승", "right": "오른쪽 승", "timeout": "시간 초과"}[record.outcome]
+		matches.append("%d경기  %s  ·  %s  ·  %.1f초\n남은 HP %.1f / %.1f  ·  받은 피해(추정) %.1f / %.1f  ·  시드 %d" % [record.match_index + 1, key, result, record.duration_seconds, record.side_a_hp_remaining, record.side_b_hp_remaining, record.side_a_damage_taken_estimate, record.side_b_damage_taken_estimate, record.seed])
+	var lines := PackedStringArray(["대진별 집계 · 왼쪽 / 오른쪽 기준"])
+	for key in matchups:
+		var totals: Dictionary = matchups[key]
+		var count: int = totals.left + totals.right + totals.timeout
+		lines.append("%s  ·  %d판  ·  %d승 / %d승  ·  시간 초과 %d  ·  평균 %.1f초" % [key, count, totals.left, totals.right, totals.timeout, totals.seconds / count])
+	lines.append("\n경기별 상세 · 수치는 왼쪽 / 오른쪽 순서")
+	lines.append_array(matches)
+	return "\n\n".join(lines)

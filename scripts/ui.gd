@@ -220,8 +220,7 @@ func select_evolution(selected: Array) -> void:
 ## Developer tool: run the real fighter AI in batches from the shipped menu.
 func show_balance_lab() -> void:
 	if balance_lab_running: return
-	clear_modal("AI 전투 밸런스 실험실", "4직업 자동 교차전 · 경기별 기록 누적 · 결과 CSV 집계")
-	add_label("데이터는 user://combat_stats/ 에 저장됩니다.\n에디터/PC에서는 재실행해도 누적되며, 웹에서는 브라우저별로 저장됩니다.", 15)
+	clear_modal("AI 전투 밸런스 실험실", "4직업 자동 교차전 · 이번 실험의 대진별 통계와 경기별 상세 결과")
 	for rounds in [10, 100, 1000]:
 		var requested: int = rounds
 		add_button("%d판 자동 실행" % rounds, func(): start_balance_lab(requested))
@@ -242,14 +241,14 @@ func start_balance_lab(rounds: int) -> void:
 		if is_instance_valid(balance_lab_status):
 			balance_lab_status.text = "%d / %d 경기 완료 (%.0f%%)" % [completed, total, 100.0 * completed / maxi(1, total)]
 	)
-	runner.batch_finished.connect(func(records: Array, saved: bool):
+	runner.batch_finished.connect(func(records: Array, failures: int):
 		balance_lab_running = false
 		balance_lab_status = null
-		show_balance_results(records, saved)
+		show_balance_results(records, failures)
 	)
 	runner.run_embedded(arena, rounds)
 
-func show_balance_results(records: Array, saved: bool) -> void:
+func show_balance_results(records: Array, failures: int) -> void:
 	var wins: Dictionary = {}
 	var decided := 0
 	var timeouts := 0
@@ -260,11 +259,17 @@ func show_balance_results(records: Array, saved: bool) -> void:
 			continue
 		wins[winner] = int(wins.get(winner, 0)) + 1
 		decided += 1
-	clear_modal("AI 대전 %d판 종료" % records.size(), "데이터 저장: %s · 승부 결정 %d · 제한시간 종료 %d" % ["완료" if saved else "실패", decided, timeouts])
-	var labels: Dictionary = {"swordsman": "검사", "spearman": "창병", "hammerman": "망치병", "shieldbearer": "방패병"}
-	for id in ["swordsman", "spearman", "hammerman", "shieldbearer"]:
-		add_label("%s: %d승" % [labels[id], int(wins.get(id, 0))], 17)
-	add_label("누적 상세 기록: user://combat_stats/matches.jsonl\n상성별 집계: user://combat_stats/summary.csv", 14)
+	clear_modal("AI 대전 %d판 종료" % records.size(), "승부 결정 %d · 시간 초과 %d · 시작 실패 %d" % [decided, timeouts, failures])
+	var labels: Dictionary = preload("res://tests/balance_lab.gd").CLASS_NAMES
+	var class_totals := PackedStringArray()
+	for id in labels:
+		class_totals.append("%s %d승" % [labels[id], wins.get(id, 0)])
+	add_label("  ·  ".join(class_totals), 16)
+	var report := RichTextLabel.new()
+	report.custom_minimum_size.y = clampf(get_viewport().get_visible_rect().size.y * 0.35, 120.0, 360.0)
+	report.selection_enabled = true
+	report.text = preload("res://tests/balance_lab.gd").format_report(records)
+	panel.add_child(report)
 	add_button("다시 실험하기", show_balance_lab)
 	add_button("메인 메뉴", show_menu)
 
