@@ -108,6 +108,9 @@ func _ready() -> void:
 	$Visual/Body.modulate = Color.WHITE
 	update_visual()
 
+func incoming_damage_multiplier(_direction_to_hit: Vector2) -> float:
+	return 1.0
+
 func snapshot_stats() -> Dictionary:
 	var result = {}
 	for key in ["max_hp", "max_stamina", "damage", "speed", "attack_speed", "armor", "crit", "lifesteal", "skill_power", "xp_gain", "body_scale", "dash_mult", "block_reduction", "gold_bonus"]:

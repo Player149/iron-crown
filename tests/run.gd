@@ -316,6 +316,7 @@ func run() -> void:
 		var actor = game.player
 		actor.level = 6
 		var picked = CrownCatalog.EVOLUTIONS[6].filter(func(c): return c[0] == spec[0])[0]
+		var damage_before_evolution: float = actor.damage
 		actor = CrownCatalog.evolve(actor, picked)
 		actor.stamina = actor.max_stamina
 		actor.invuln = 0
@@ -357,6 +358,14 @@ func run() -> void:
 			near(actor.hp, 40.0 + actor.max_hp * 0.25, "Ironman restores 25% of max health")
 		elif spec[0] == "shieldbearer":
 			check(actor.guard != null and actor.guard.mode == "barrier", "Shield uses durability barrier guard")
+			near(actor.damage, damage_before_evolution * 0.8, "Shieldbearer evolution lowers base attack by 20 percent")
+			actor.facing = 0.0
+			actor.armor = 0.0
+			near(game.deal_damage(actor, 20.0, victim), 15.0, "Frontal hit receives passive shield reduction")
+			near(game.deal_damage(actor, 20.0, victim, Vector2.UP), 20.0, "Side projectile bypasses passive shield reduction")
+			near(game.deal_damage(actor, 20.0, victim, Vector2.LEFT), 20.0, "Rear projectile bypasses passive shield reduction")
+			near(game.deal_damage(actor, 20.0, null), 20.0, "Directionless hazard bypasses passive shield reduction")
+			actor.hp = actor.max_hp
 			actor.guard.phase = "hold"
 			actor.guard.blocking = true
 			actor.stamina = 50.0
@@ -504,7 +513,8 @@ func run() -> void:
 	check(game.player.class_name_text == "창병" and game.duel_enemy.class_name_text == "방패병", "Duel picks the requested classes")
 	check(game.player.level == 6 and game.duel_enemy.level == 6, "Duel starts both at Lv6")
 	near(game.player.max_hp, game.duel_enemy.max_hp, "Duel players have equal maximum HP")
-	near(game.player.damage, game.duel_enemy.damage, "Duel players have equal base attack")
+	near(game.duel_enemy.damage, game.player.damage * 0.8, "Duel preserves shieldbearer attack penalty")
+	near(game.duel_enemy.base_stats.damage, game.player.base_stats.damage * 0.8, "Boss normalization preserves shieldbearer base attack")
 	near(game.player.stamina, game.duel_enemy.stamina, "Duel players start with equal stamina")
 	check(game.get_node("Zones").visible == false, "Duel hides XP zones")
 	var duel_xp_before: float = game.player.xp

@@ -62,6 +62,8 @@ static func evolve(f, choice: Array):
 	if not options_for(f, d.unlock_level).any(func(row): return row[0] == d.id): return f
 	if d.evolution_scene != null:
 		f = f.arena.replace_fighter_scene(f, d)
+		# Boss trials normalize growth against base stats, including the new class's base attack.
+		f.base_stats.damage *= d.multipliers.get("damage", 1.0)
 	f.evolutions.append(d.id)
 	f.class_name_text = d.title
 	var old_hp = f.max_hp

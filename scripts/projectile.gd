@@ -22,7 +22,7 @@ func tick(dt: float) -> void:
 			continue
 		if position.distance_to(target.position) < radius + target.radius:
 			hit.append(target)
-			arena.deal_damage(target, damage, source)
+			arena.deal_damage(target, damage, source, -velocity)
 			pierce -= 1
 			if pierce <= 0:
 				lifetime = 0

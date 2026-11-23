@@ -374,7 +374,7 @@ func nearest_fighter(at: Vector2, distance: float):
 			best = f
 	return best
 
-func deal_damage(target, amount: float, source) -> float:
+func deal_damage(target, amount: float, source, direction_to_hit: Vector2 = Vector2.ZERO) -> float:
 	if not target.alive or target.invuln > 0: return 0
 	if coronation != null and coronation.phase == 2:
 		if not coronation.bracket.can_target(source, target): return 0
@@ -396,6 +396,10 @@ func deal_damage(target, amount: float, source) -> float:
 	var reduction = target.armor / (100.0 + target.armor)
 	if was_blocking:
 		reduction = 1 - (1 - reduction) * (1 - shield_reduction)
+	if target is CrownFighter:
+		if direction_to_hit.is_zero_approx() and is_instance_valid(source):
+			direction_to_hit = source.position - target.position
+		amount *= target.incoming_damage_multiplier(direction_to_hit)
 	var final = maxf(1, amount * (1 - reduction))
 	if duel:
 		# A fully absorbed shield hit is not a damage contribution.

@@ -8,4 +8,5 @@ title = "방패병"
 description = "방패 타격 · 막기와 완벽 방어"
 unlock_level = 6
 parent_ids = PackedStringArray("knight")
+multipliers = {"damage": 0.8}
 evolution_scene = ExtResource("2")
