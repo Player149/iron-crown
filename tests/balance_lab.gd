@@ -64,6 +64,8 @@ func run_batch() -> void:
 		for fighter in [left, right]:
 			var animation: AnimationPlayer = fighter.get_node("AnimationPlayer")
 			animation.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		var left_spawn: Vector2 = left.position
+		var right_spawn: Vector2 = right.position
 		var left_taken := 0.0
 		var right_taken := 0.0
 		var left_hp_before: float = left.hp
@@ -93,6 +95,7 @@ func run_batch() -> void:
 			"recorded_at_utc": Time.get_datetime_string_from_system(true),
 			"mode": "ai_duel",
 			"match_index": i,
+			"balance_hash": str(FileAccess.get_file_as_string("res://data/balance.tres").hash()),
 			"seed": match_seed,
 			"side_a_class": left_class,
 			"side_b_class": right_class,
@@ -104,6 +107,10 @@ func run_batch() -> void:
 			"side_b_level": right.level,
 			"arena": "duel",
 			"starting_distance": game.balance.duel_spawn_distance,
+			"side_a_start": [left_spawn.x, left_spawn.y],
+			"side_b_start": [right_spawn.x, right_spawn.y],
+			"side_a_end": [left.position.x, left.position.y],
+			"side_b_end": [right.position.x, right.position.y],
 			"duration_seconds": snappedf(ticks * DT, 0.01),
 			"outcome": outcome,
 			"winner_class": left_class if outcome == "left" else (right_class if outcome == "right" else ""),
