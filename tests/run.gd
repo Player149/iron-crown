@@ -23,6 +23,8 @@ func run() -> void:
 	get_tree().root.add_child(game)
 	game.set_physics_process(false)
 	game.start_game()
+	check(game.ui.box.has_node("BalanceLab"), "Main menu exposes AI balance laboratory")
+	check(load("res://tests/balance_lab.gd") != null, "Embedded balance laboratory script is loadable")
 	var p = game.player
 	# Explicit advance() calls control animation time in this test.
 	p.get_node("AnimationPlayer").callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
