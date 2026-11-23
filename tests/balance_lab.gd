@@ -1,4 +1,11 @@
 extends Node
+
+signal batch_progress(completed: int, total: int)
+signal batch_finished(records: Array, saved: bool)
+var embedded := false
+var host_game
+var previous_mute := false
+var previous_equipped: Array = []
 ## Development-only AI vs AI balance laboratory.
 ## Run this scene (F6) or: godot --headless --path . res://tests/balance_lab.tscn -- --runs=100 --seed=421
 ## Uses the real arena, fighter AI, character scenes, attacks and hit callbacks.
@@ -23,15 +30,28 @@ func _ready() -> void:
 			requested_runs = clampi(int(argument.trim_prefix("--runs=")), 1, MAX_RUNS)
 		elif argument.begins_with("--seed="):
 			seed_base = int(argument.trim_prefix("--seed="))
+	if not embedded: call_deferred("run_batch")
+
+func run_embedded(existing_game, rounds: int) -> void:
+	if game != null: return
+	embedded = true
+	host_game = existing_game
+	requested_runs = clampi(rounds, 1, MAX_RUNS)
 	call_deferred("run_batch")
 
 func run_batch() -> void:
-	# No permanent rune bonuses or profile writes during automated matches.
+	# Preserve the player preferences. The caller can keep using the same game.
+	previous_mute = Meta.muted
+	previous_equipped = Meta.equipped.duplicate()
 	Meta.muted = true
 	Meta.equipped = []
-	game = load("res://scenes/main.tscn").instantiate()
-	get_tree().root.add_child(game)
+	if host_game == null:
+		game = load("res://scenes/main.tscn").instantiate()
+		get_tree().root.add_child(game)
+	else:
+		game = host_game
 	game.set_physics_process(false)
+	results.clear()
 	var total := CLASSES.size() * CLASSES.size()
 	var failures := 0
 	for i in requested_runs:
@@ -47,6 +67,7 @@ func run_batch() -> void:
 		seed(match_seed)
 		game.start_duel(left_class, right_class)
 		# Let the already queued old actor nodes leave the scene tree.
+		if embedded: batch_progress.emit(i, requested_runs)
 		await get_tree().process_frame
 		var left = game.player
 		var right = game.duel_enemy
@@ -120,6 +141,7 @@ func run_batch() -> void:
 			"side_b_hp_remaining": snappedf(maxf(0.0, right.hp), 0.01)
 		}
 		results.append(record)
+		if embedded: batch_progress.emit(i + 1, requested_runs)
 		if i % 10 == 0 or i == requested_runs - 1:
 			print("BALANCE LAB %d/%d, %s vs %s: %s" % [i + 1, requested_runs, left_class, right_class, outcome])
 	var saved := append_results(results)
@@ -128,9 +150,18 @@ func run_batch() -> void:
 	print("BALANCE LAB: %d matches, %d initialization failures; persisted=%s" % [results.size(), failures, saved])
 	print("BALANCE LAB: %s" % ProjectSettings.globalize_path(MATCHES_FILE))
 	print("BALANCE LAB: %s" % ProjectSettings.globalize_path(SUMMARY_FILE))
-	game.queue_free()
-	await get_tree().process_frame
-	get_tree().quit(0 if saved and failures == 0 else 1)
+	Meta.muted = previous_mute
+	Meta.equipped = previous_equipped
+	if embedded:
+		game.return_menu()
+		game.set_physics_process(true)
+		batch_finished.emit(results.duplicate(true), saved and failures == 0)
+		game = null
+		queue_free()
+	else:
+		game.queue_free()
+		await get_tree().process_frame
+		get_tree().quit(0 if saved and failures == 0 else 1)
 
 func append_results(records: Array[Dictionary]) -> bool:
 	var absolute_dir := ProjectSettings.globalize_path(OUTPUT_DIR)
