@@ -4,6 +4,8 @@ var source
 var arena
 var velocity: Vector2
 var damage: float = 20
+var stagger_power: float = 0.0
+var stagger_duration: float = 0.0
 var lifetime: float = 1.3
 var radius: float = 13
 var pierce: int = 1
@@ -22,7 +24,7 @@ func tick(dt: float) -> void:
 			continue
 		if position.distance_to(target.position) < radius + target.radius:
 			hit.append(target)
-			arena.deal_damage(target, damage, source, -velocity)
+			arena.deal_damage(target, damage, source, -velocity, stagger_power, stagger_duration)
 			pierce -= 1
 			if pierce <= 0:
 				lifetime = 0

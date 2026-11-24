@@ -5,3 +5,9 @@ script = ExtResource("1")
 id = "swordsman"
 title = "검사"
 description = "검사 제작용 기본 틀"
+
+poise = 20.0
+attack_stagger_power = 25.0
+attack_stagger_duration = 0.25
+guard_stagger_power = 30.0
+guard_stagger_duration = 0.42

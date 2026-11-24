@@ -3,6 +3,7 @@ extends "res://scripts/fighter.gd"
 @export var buff_cooldown: float = 12.0
 @export var buff_duration: float = 6.0
 @export var buff_multiplier := 1.25
+@export var buff_poise_bonus: float = 0.0
 @export_range(0.0, 1.0) var frontal_damage_reduction: float = 0.25
 @export_range(0.0, 180.0) var frontal_half_angle_degrees: float = 60.0
 var useless_left: float = 0.0
@@ -28,7 +29,9 @@ func skill(key: String) -> void:
 	if key != "e":
 		super.skill(key)
 		return
-	if not arena.active() or not can_act() or guard_busy() or attack_lock > 0.0 or cooldown.e > 0.0: return
+	if not arena.active() or not can_start_cancel_action() or cooldown.e > 0.0: return
+	cancel_basic_attack()
+	set_poise_modifier("shield_buff", buff_poise_bonus, buff_duration)
 	cooldown.e = buff_cooldown
 	damage *= buff_multiplier
 	useless_left = buff_duration
@@ -38,6 +41,7 @@ func skill(key: String) -> void:
 func clear_match_action() -> void:
 	if useless_left > 0.0: damage /= buff_multiplier
 	useless_left = 0.0
+	remove_poise_modifier("shield_buff")
 
 func attack() -> void:
 	super.attack()

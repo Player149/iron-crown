@@ -5,3 +5,9 @@ script = ExtResource("1")
 id = "hammerman"
 title = "망치병"
 description = "망치병 제작용 기본 틀"
+
+poise = 40.0
+attack_stagger_power = 35.0
+attack_stagger_duration = 0.20
+guard_stagger_power = 0.0
+guard_stagger_duration = 0.00

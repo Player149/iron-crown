@@ -6,6 +6,9 @@ extends Node2D
 @export var normal_damage := 8.0
 @export var brute_damage := 13.0
 @export var attack_seconds := 1.15
+@export var normal_stagger_power: float = 12.0
+@export var brute_stagger_power: float = 22.0
+@export var stagger_duration: float = 0.15
 @export var aggro_range := 360.0
 @export var stop_distance := 45.0
 @export var attack_distance := 55.0
@@ -73,7 +76,7 @@ func tick(dt: float) -> void:
 		if delta.length() > stop_distance:
 			position += delta.normalized() * speed * dt
 		if delta.length() < attack_distance and cooldown <= 0:
-			var dealt: float = arena.deal_damage(target, brute_damage if brute else normal_damage, self)
+			var dealt: float = arena.deal_damage(target, brute_damage if brute else normal_damage, self, Vector2.ZERO, brute_stagger_power if brute else normal_stagger_power, stagger_duration)
 			if dealt > 0.0 and coronation_kind == "field": target.coronation_effect = -arena.coronation_rules.slow_seconds
 			cooldown = attack_seconds
 	$Sprite2D.rotation += dt

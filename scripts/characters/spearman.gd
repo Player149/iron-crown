@@ -4,6 +4,9 @@ extends "res://scripts/fighter.gd"
 @export var lunge_duration: float = 0.20
 @export var lunge_speed: float = 650.0
 @export var lunge_damage_fraction: float = 0.5
+@export var lunge_stagger_power: float = 30.0
+@export var lunge_stagger_duration: float = 0.24
+@export var lunge_poise_bonus: float = 10.0
 @export var spear_reach := 138.0
 @export var spear_arc_degrees := 42.0
 @export var lunge_contact_padding := 24.0
@@ -17,14 +20,20 @@ func _ready() -> void:
 	attack_arc_override_degrees = spear_arc_degrees
 
 func clear_match_action() -> void:
+	cancel_special_action()
+
+func cancel_special_action() -> void:
 	lunge_left = 0.0
 	lunge_hits.clear()
+	remove_poise_modifier("lunge")
 
 func skill(key: String) -> void:
 	if key != "e":
 		super.skill(key)
 		return
-	if not arena.active() or not can_act() or guard_busy() or attack_lock > 0.0 or cooldown.e > 0.0 or dash_left > 0.0: return
+	if not arena.active() or not can_start_cancel_action() or cooldown.e > 0.0: return
+	cancel_basic_attack()
+	set_poise_modifier("lunge", lunge_poise_bonus, lunge_duration)
 	cooldown.e = lunge_cooldown
 	lunge_left = lunge_duration
 	lunge_hits.clear()
@@ -38,7 +47,7 @@ func tick(dt: float) -> void:
 	super.tick(dt)
 	if lunge_left <= 0.0: return
 	if not can_act():
-		lunge_left = 0.0
+		cancel_special_action()
 		return
 	hit_lunge_path(old_position, position)
 	lunge_left = maxf(0.0, lunge_left - dt)
@@ -56,7 +65,8 @@ func hit_lunge_path(start: Vector2, finish: Vector2) -> void:
 		var closest: Vector2 = start + step * t
 		if closest.distance_to(target.position) > target.radius + lunge_contact_padding: continue
 		lunge_hits[target.get_instance_id()] = true
-		arena.deal_damage(target, damage * lunge_damage_fraction, self)
+		arena.deal_damage(target, damage * lunge_damage_fraction, self, Vector2.ZERO, lunge_stagger_power, lunge_stagger_duration)
+		if not can_act() or lunge_left <= 0.0: break
 
 func ai_preferred_distance(reach: float) -> float:
 	return reach - 32.0

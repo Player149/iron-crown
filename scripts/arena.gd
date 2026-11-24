@@ -214,7 +214,7 @@ func replace_fighter_scene(old_f, definition: CrownCharacterDefinition):
 		"radius", "alive", "kills", "boss_flag", "boss_damage", "boss_kills",
 		"invuln", "stamina", "max_stamina", "exhaustion_left",
 		"damage_contributors", "combat_left", "no_hit_time", "groggy_left",
-		"groggy", "groggy_decay_left", "groggy_immunity", "dash_left",
+		"groggy", "groggy_decay_left", "groggy_immunity", "hitstun_left", "hitstun_immunity", "dash_left",
 		"dash_velocity", "facing", "evolutions", "class_name_text",
 		"cooldown", "base_stats", "ai_target", "ai_retarget", "ai_retreat_left", "ai_retreat_cooldown",
 		"ai_defense_recovery", "respawn_timer", "attack_lock", "swing_power", "show_attack_range",
@@ -418,7 +418,7 @@ func nearest_fighter(at: Vector2, distance: float):
 			best = f
 	return best
 
-func deal_damage(target, amount: float, source, direction_to_hit: Vector2 = Vector2.ZERO) -> float:
+func deal_damage(target, amount: float, source, direction_to_hit: Vector2 = Vector2.ZERO, stagger_power: float = 0.0, stagger_duration: float = 0.0) -> float:
 	if not target.alive or target.invuln > 0: return 0
 	if coronation != null and coronation.phase == 2:
 		if not coronation.bracket.can_target(source, target): return 0
@@ -433,6 +433,8 @@ func deal_damage(target, amount: float, source, direction_to_hit: Vector2 = Vect
 	if target is CrownFighter and target.guard != null:
 		shield_reduction = target.guard.receive_hit(source, amount)
 	var was_blocking = shield_reduction >= 0.0
+	if was_blocking and source is CrownFighter:
+		source.apply_hitstun(target.definition.guard_stagger_power, target.definition.guard_stagger_duration)
 	# Barrier guard negates a hit completely: no HP, groggy, lifesteal or XP.
 	if shield_reduction >= 1.0:
 		float_text(target.position, "방어!", Color("80cffa"))
@@ -452,6 +454,7 @@ func deal_damage(target, amount: float, source, direction_to_hit: Vector2 = Vect
 	target.hp -= final
 	if target is CrownFighter and target.hp > 0 and not was_blocking:
 		target.add_groggy(balance.groggy_hit)
+		target.apply_hitstun(stagger_power, stagger_duration)
 	if source is CrownFighter:
 		source.hp = minf(source.max_hp, source.hp + final * source.lifesteal)
 		add_xp(source, minf(balance.hit_xp_cap, final * balance.hit_xp_per_damage))
@@ -474,6 +477,9 @@ func recent_contributor_count(victim) -> int:
 func kill_target(target, killer) -> void:
 	if not target.alive: return
 	target.hp = 0
+	if target is CrownFighter:
+		target.interrupt_actions()
+		target.reset_hitstun()
 	target.alive = false
 	target.hide()
 	target.respawn_timer = randf_range(5, 9)
@@ -525,12 +531,12 @@ func kill_target(target, killer) -> void:
 		bank_gold()
 		ui.show_gameover()
 
-func area_attack(source, radius: float, power: float) -> void:
+func area_attack(source, radius: float, power: float, stagger_power: float = 0.0, stagger_duration: float = 0.0) -> void:
 	fx_ring(source.position, radius, source.attack_color(), 0.4)
 	for target in targets(source):
-		if source.position.distance_to(target.position) < radius + target.radius: deal_damage(target, power, source)
+		if source.position.distance_to(target.position) < radius + target.radius: deal_damage(target, power, source, Vector2.ZERO, stagger_power, stagger_duration)
 
-func shoot(source, angle: float, speed: float, power: float, life: float, pierce: int = 1) -> void:
+func shoot(source, angle: float, speed: float, power: float, life: float, pierce: int = 1, stagger_power: float = 0.0, stagger_duration: float = 0.0) -> void:
 	var p = ProjectileScene.instantiate()
 	p.source = source
 	p.arena = self
@@ -539,6 +545,8 @@ func shoot(source, angle: float, speed: float, power: float, life: float, pierce
 	p.damage = power
 	p.lifetime = life
 	p.pierce = pierce
+	p.stagger_power = stagger_power
+	p.stagger_duration = stagger_duration
 	p.tint = source.attack_color()
 	$Projectiles.add_child(p)
 
@@ -601,7 +609,8 @@ func start_boss(manual: bool = false) -> void:
 		f.hp = f.max_hp
 		f.combat_left = 0
 		f.reset_groggy()
-		f.reset_guard()
+		f.reset_hitstun()
+		f.interrupt_actions()
 		f.exhaustion_left = 0.0
 		f.damage_contributors.clear()
 		f.invuln = 1
@@ -634,7 +643,8 @@ func finish_boss(victory: bool) -> void:
 	run_gold += reward
 	for s in snapshots:
 		for key in s.values: s.fighter.set(key, s.values[key].duplicate() if key in ["cooldown", "damage_contributors"] else s.values[key])
-		s.fighter.reset_guard()
+		s.fighter.interrupt_actions()
+		s.fighter.reset_hitstun()
 		s.fighter.boss_flag = false
 		s.fighter.visible = s.fighter.alive
 	clear_projectiles()
@@ -662,7 +672,8 @@ func revive() -> void:
 	player.show()
 	player.hp = player.max_hp
 	player.reset_groggy()
-	player.reset_guard()
+	player.reset_hitstun()
+	player.interrupt_actions()
 	player.stamina = player.max_stamina
 	player.exhaustion_left = 0.0
 	player.damage_contributors.clear()

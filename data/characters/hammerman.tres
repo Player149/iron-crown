@@ -9,3 +9,9 @@ description = "느린 회전 강타 · 망치 전용 공격 모션"
 unlock_level = 6
 parent_ids = PackedStringArray("knight")
 evolution_scene = ExtResource("2")
+
+poise = 40.0
+attack_stagger_power = 35.0
+attack_stagger_duration = 0.20
+guard_stagger_power = 0.0
+guard_stagger_duration = 0.00

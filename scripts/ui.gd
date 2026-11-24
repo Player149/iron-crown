@@ -402,7 +402,7 @@ func update_hud() -> void:
 	hud.get_node("Info/Stats").text = ("HP %d/%d · 기력 %d/%d · 그로기 %d\n공격 %d · 직업 %s" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), roundi(p.damage), p.class_name_text]) if arena.mode in ["duel", "duel_result"] else ("HP %d/%d · 기력 %d/%d · 그로기 %d\n골드 %d · 처치 %d · 공격 %d" % [ceili(p.hp), roundi(p.max_hp), ceili(p.stamina), roundi(p.max_stamina), floori(p.groggy), arena.run_gold, arena.run_kills, roundi(p.damage)])
 	if p.guard != null and p.guard.mode == "barrier":
 		hud.get_node("Info/Stats").text += " · 방패 %d/%d" % [ceili(p.guard.meter), roundi(p.guard.meter_max)]
-	hud.get_node("Info/Status").text = ("탈진 %.1f초" % p.exhaustion_left) if p.exhaustion_left > 0 else (("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투"))
+	hud.get_node("Info/Status").text = ("탈진 %.1f초" % p.exhaustion_left) if p.exhaustion_left > 0 else (("그로기 %.1f초" % p.groggy_left) if p.groggy_left > 0 else (("경직 %.2f초" % p.hitstun_left) if p.hitstun_left > 0 else ("전투 중 %.1f초" % p.combat_left if p.combat_left > 0 else p.class_name_text + " · 비전투")))
 	if arena.mode in ["duel", "duel_result"] and is_instance_valid(arena.duel_enemy):
 		var opponent = arena.duel_enemy
 		var opponent_barrier = " · 방패 %d" % ceili(opponent.guard.meter) if opponent.guard != null and opponent.guard.mode == "barrier" else ""

@@ -1,0 +1,11 @@
+# Hitstun and basic attack cancellation (initial tuning)
+
+A fighter is staggered on an unblocked hit, or an attacker on a successful guard. Existing groggy, exhaustion, damage, stamina and parry remain separate. Strength P <= 0 or base duration <= 0 disables it; effective poise R > P prevents it. Otherwise max(min(global minimum, base duration), base duration * (1 - 0.5 * R/P)). The global floor is 0.10 s and post-hitstun immunity 0.50 s. Existing hitstun cannot be extended. Facing and stamina regeneration are allowed; movement, attack, guard, dash and skills are blocked. Existing groggy decay runs normally. Existing stronger disable states take precedence.
+
+Character resources and editor templates expose poise, normal stagger power/duration and guard recoil power/duration. Knight 10/12/0.15/0/0; sword 20/25/0.25/30/0.42; spear 15/20/0.20/10/0.25; hammer 40/35–60/0.20–0.40/0/0; shield 35/20/0.20/36/0.48. Higher evolution forms reuse their existing physical class profiles. These are initial hypotheses, not measured balance.
+
+CrownFighter.set_poise_modifier(source, amount, duration=-1) sets or replaces a named additive modifier. Negative amount reduces poise. Negative duration persists until remove_poise_modifier(source); positive duration automatically expires. set_effective_poise(source, value, duration) sets a modifier to reach the requested effective value at that instant. CrownAbility resources expose poise_bonus, poise_duration, stagger_power and stagger_duration. Custom class E scripts expose their own modifier knobs. Hammer gains +12 poise at 2s charge and during the charged swing; spear gains +10 during E lunge. Other custom E poise bonuses default to zero. Projectiles snapshot their stagger profile at launch.
+
+Basic swing (including hammer charge) can be cancelled into a valid dash or skill, before or after the damage keyframe. No stamina or cooldown refund. A cancelled startup cannot deal damage, committed damage remains. Skill swing is not a basic swing. Hitstun can interrupt pending skills and motion; committed attack recovery is retained. On respawn and encounter transitions transient states reset.
+
+Regression tests: tests/run.tscn. Web/real input and balance need playtesting.

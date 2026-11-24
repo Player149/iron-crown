@@ -17,6 +17,12 @@ extends Resource
 @export var dash_speed: float = 850.0
 @export var invulnerability: float = 0.0
 @export var heal_fraction: float = 0.0
+@export_group("Hitstun")
+@export var stagger_power: float = 25.0
+@export var stagger_duration: float = 0.22
+@export var poise_bonus: float = 0.0
+## Zero uses the cast animation length.
+@export var poise_duration: float = 0.0
 
 func execute(f) -> void:
 	var damage = f.damage * f.skill_power * power
@@ -25,9 +31,9 @@ func execute(f) -> void:
 		f.dash_velocity = Vector2.from_angle(f.facing) * dash_speed
 	f.invuln = maxf(f.invuln, invulnerability)
 	if effect == "area":
-		f.arena.area_attack(f, radius, damage)
+		f.arena.area_attack(f, radius, damage, stagger_power, stagger_duration)
 	else:
 		for i in projectile_count:
 			var angle = i * TAU / projectile_count if radial else f.facing + (i - (projectile_count - 1) / 2.0) * spread
-			f.arena.shoot(f, angle, projectile_speed, damage, projectile_lifetime, pierce)
+			f.arena.shoot(f, angle, projectile_speed, damage, projectile_lifetime, pierce, stagger_power, stagger_duration)
 	f.hp = minf(f.max_hp, f.hp + f.max_hp * heal_fraction)

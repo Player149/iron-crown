@@ -5,3 +5,9 @@ script = ExtResource("1")
 id = "shieldbearer"
 title = "방패병"
 description = "방패병 제작용 기본 틀"
+
+poise = 35.0
+attack_stagger_power = 20.0
+attack_stagger_duration = 0.20
+guard_stagger_power = 36.0
+guard_stagger_duration = 0.48

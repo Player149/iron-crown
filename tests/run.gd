@@ -57,13 +57,44 @@ func run() -> void:
 	check(attack_target.hp < hp_before_swing, "Swing hit timing applies damage")
 	var stamina_before_dash = p.stamina
 	p.dash(Vector2.RIGHT)
-	near(p.stamina, stamina_before_dash, "Cannot dash-cancel attack recovery")
-	p.attack_lock = 0
-	p.cooldown.dash = 0
-	p.dash(Vector2.RIGHT)
-	check(p.stamina < stamina_before_dash, "Dash consumes stamina when available")
+	near(p.stamina, stamina_before_dash - game.balance.dash_stamina_cost, "Dash cancels normal attack recovery and consumes stamina")
+	check(p.dash_left > 0.0 and p.attack_lock <= 0.0 and not p.swing_active, "Dash starts and clears basic swing")
 	p.dash_left = 0
+	p.invuln = 0
 	p.cooldown.dash = 0
+	p.cooldown.attack = 0
+	p.stamina = p.max_stamina
+	p.attack()
+	var hp_before_cancel: float = attack_target.hp
+	p.dash(Vector2.RIGHT)
+	p.resolve_attack_hit()
+	near(attack_target.hp, hp_before_cancel, "Cancelling startup prevents stale hit event")
+	near(p.cooldown.attack, maxf(p.definition.attack_cooldown / p.attack_speed, p.get_node("AnimationPlayer").get_animation("swing").length / p.attack_speed), "Cancellation preserves attack cooldown")
+	near(CrownFighter.calculate_hitstun(50, 0.30, 50, 0.10), 0.15, "Equal poise halves hitstun")
+	near(CrownFighter.calculate_hitstun(50, 0.30, 51, 0.10), 0, "Higher poise prevents hitstun")
+	near(CrownFighter.calculate_hitstun(50, 0.15, 50, 0.10), 0.10, "Minimum hitstun clamps reduction")
+	near(CrownFighter.calculate_hitstun(0, 0.30, 0, 0.10), 0, "Zero stagger power disables hitstun")
+	p.dash_left = 0.0
+	p.invuln = 0.0
+	p.set_poise_modifier("test", 30.0, 0.25)
+	near(p.effective_poise(), 40.0, "Timed skill poise adds to base")
+	check(not p.apply_hitstun(25, 0.3), "Poise bonus prevents weak stagger")
+	p.update_poise_modifiers(0.25)
+	near(p.effective_poise(), 10.0, "Poise expires without changing base")
+	check(p.apply_hitstun(25, 0.30), "Hitstun applies below strength")
+	near(p.hitstun_left, 0.24, "Duration scales with poise")
+	check(not p.apply_hitstun(100, 1.0), "Active hitstun does not stack")
+	p.stamina = 50.0
+	var before_stun_position: Vector2 = p.position
+	game.touch_move = Vector2.RIGHT
+	p.tick(0.1)
+	near(p.position.distance_to(before_stun_position), 0, "Hitstun prevents movement")
+	near(p.stamina, 50.0 + game.balance.stamina_regen * 0.1, "Hitstun allows stamina recovery")
+	check(not p.can_act(), "Hitstun blocks actions")
+	p.update_hitstun(0.2)
+	check(p.can_act() and not p.apply_hitstun(100, 1.0), "Recovery grants hitstun-only immunity")
+	p.reset_hitstun()
+	game.touch_move = Vector2.ZERO
 	# Guard coverage uses the shield archetype, not a guard bolted onto the starter.
 	var defender = load("res://scenes/characters/swordsman.tscn").instantiate()
 	defender.arena = game
@@ -326,9 +357,14 @@ func run() -> void:
 		victim.position = actor.position + Vector2(40, 0)
 		victim.invuln = 0
 		if spec[0] == "swordsman":
+			actor.attack()
+			check(actor.basic_swing, "Sword normal swing starts before E")
 			actor.cooldown.attack = 2.0
 			actor.cooldown.e = 0
 			actor.skill("e")
+			check(actor.swing_active and not actor.basic_swing, "Sword E cancels basic swing into independent skill swing")
+			actor.dash(Vector2.RIGHT)
+			check(actor.dash_left <= 0.0 and actor.swing_active, "Dash does not cancel sword skill swing")
 			near(actor.swing_power, 1.25, "Sword E swing deals 125%")
 			near(actor.cooldown.attack, 2.0, "Sword E does not change normal attack cooldown")
 			check(actor.cooldown.e > 0.0, "Sword E has separate skill cooldown")
@@ -344,7 +380,9 @@ func run() -> void:
 			check(actor.hp < hp_before_simple_guard, "Simple spear guard reduces damage, not negates it")
 			near(victim.stamina, stamina_before_guard_hit, "Spear guard does not punish attacking stamina")
 			actor.guard.reset()
+			actor.attack()
 			actor.skill("e")
+			check(not actor.swing_active, "Lunge cancels normal swing")
 			check(actor.cooldown.e > 0.0 and actor.lunge_left > 0.0, "Spear E begins short damaging lunge")
 			near(actor.dash_velocity.length(), 650.0, "Spear E lunge speed")
 		elif spec[0] == "hammerman":
@@ -353,10 +391,10 @@ func run() -> void:
 			actor.charge_time = 3.0
 			actor.release_charge()
 			near(actor.swing_power, 2.5, "Full hammer charge deals 250%")
-			actor.attack_lock = 0.0
 			actor.cooldown.e = 0.0
 			actor.hp = 40.0
 			actor.skill("e")
+			check(not actor.swing_active and actor.attack_lock <= 0.0, "Hammer heal cancels normal swing")
 			near(actor.hp, 40.0 + actor.max_hp * 0.25, "Ironman restores 25% of max health")
 		elif spec[0] == "shieldbearer":
 			check(actor.guard != null and actor.guard.mode == "barrier", "Shield uses durability barrier guard")
@@ -379,6 +417,7 @@ func run() -> void:
 			near(actor.hp, barrier_hp, "Barrier negates incoming damage")
 			near(actor.stamina, barrier_stamina, "Barrier consumes no stamina when hit")
 			near(actor.guard.meter, 70.0, "Barrier meter loses incoming damage")
+			check(victim.hitstun_left > 0.0 and actor.hitstun_left <= 0.0, "Successful guard staggers only attacker")
 			actor.guard.requested = true
 			actor.guard.tick(0.5)
 			near(actor.stamina, barrier_stamina - game.balance.guard_drain_per_second * 0.25, "Barrier hold drains half the timed guard rate")

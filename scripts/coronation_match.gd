@@ -204,6 +204,7 @@ func reset_fighter(f, position: Vector2, protection: float) -> void:
 	for animator in f.ability_players.values(): animator.stop()
 	f.reset_guard()
 	f.reset_groggy()
+	f.reset_hitstun()
 	f.reset_weapon_pose()
 	f.clear_match_action()
 	f.coronation_effect = 0.0

@@ -16,3 +16,10 @@ extends Resource
 @export var attack_animation: Animation
 @export var attack_cooldown: float = 0.56
 @export var attack_target_limit: int = 2
+
+@export_group("Hitstun")
+@export var poise: float = 10.0
+@export var attack_stagger_power: float = 12.0
+@export var attack_stagger_duration: float = 0.15
+@export var guard_stagger_power: float = 0.0
+@export var guard_stagger_duration: float = 0.0

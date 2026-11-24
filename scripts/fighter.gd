@@ -56,6 +56,12 @@ var exhaustion_left: float = 0.0
 var damage_contributors: Dictionary = {} # attacker instance ID -> most recent hit time
 @onready var guard = get_node_or_null("Guard")
 var attack_lock: float = 0.0
+var swing_active: bool = false
+var basic_swing: bool = false
+var swing_hit_committed: bool = false
+var hitstun_left: float = 0.0
+var hitstun_immunity: float = 0.0
+var poise_modifiers: Dictionary = {}
 ## Damage multiplier for current authored swing animation and its hit event.
 var swing_power: float = 1.0
 var combat_left: float = 0
@@ -124,6 +130,8 @@ func tick(dt: float) -> void:
 		cooldown[key] = maxf(0, cooldown[key] - dt)
 	invuln = maxf(0, invuln - dt)
 	attack_lock = maxf(0, attack_lock - dt)
+	update_hitstun(dt)
+	update_poise_modifiers(dt)
 	if exhaustion_left > 0.0: exhaustion_left = maxf(0.0, exhaustion_left - dt)
 	elif stamina <= 0.0: trigger_exhaustion()
 	update_groggy(dt)
@@ -137,8 +145,12 @@ func tick(dt: float) -> void:
 			player_control()
 		else:
 			ai_control(dt)
+	elif hitstun_left > 0.0 and groggy_left <= 0.0 and exhaustion_left <= 0.0:
+		if is_player: player_control()
+		elif is_instance_valid(ai_target) and ai_target.alive:
+			facing = (ai_target.position - position).angle()
 	if guard != null: guard.tick(dt)
-	if not guard_busy() and attack_lock <= 0 and exhaustion_left <= 0.0:
+	if exhaustion_left <= 0.0 and (hitstun_left > 0.0 or (not guard_busy() and attack_lock <= 0.0)):
 		stamina = minf(max_stamina, stamina + arena.balance.stamina_regen * dt)
 	if dash_left > 0 and can_act():
 		dash_left -= dt
@@ -165,6 +177,7 @@ func player_control() -> void:
 		elif move.length() > 0.1: facing = move.angle()
 	else:
 		facing = (get_global_mouse_position() - global_position).angle()
+	if not can_act(): return
 	if guard != null: guard.requested = Input.is_action_pressed("block") or arena.touch_block
 	var multiplier = arena.balance.sprint_multiplier if Input.is_action_pressed("run") or arena.touch_run else 1.0
 	if guard_busy(): multiplier *= arena.balance.guard_move_multiplier
@@ -225,7 +238,7 @@ func ai_control(dt: float) -> void:
 	if guard_busy():
 		velocity *= arena.balance.guard_move_multiplier
 		return
-	if attack_lock > 0.0 or not pending_skills.is_empty(): return
+	if (attack_lock > 0.0 and not basic_swing) or not pending_skills.is_empty(): return
 
 	if ai_use_class_skill(distance, reach, retreating, target_ready): return
 	if retreating:
@@ -291,7 +304,7 @@ func ai_defend(threat: float, escape: Vector2, dt: float) -> bool:
 		ai_reaction_left = randf_range(arena.balance.ai_player_reaction_seconds.x, arena.balance.ai_player_reaction_seconds.y)
 	elif facing_player:
 		ai_reaction_left = maxf(0.0, ai_reaction_left - dt)
-	if attack_lock > 0.0 or not pending_skills.is_empty(): return false
+	if (attack_lock > 0.0 and not basic_swing) or not pending_skills.is_empty(): return false
 
 	var guard_windup: float = arena.balance.guard_windup
 	var can_guard_hit := false
@@ -328,7 +341,107 @@ func ai_threat_time(target: CrownFighter) -> float:
 	return remaining
 
 func can_act() -> bool:
-	return alive and groggy_left <= 0 and exhaustion_left <= 0.0
+	return alive and groggy_left <= 0 and exhaustion_left <= 0.0 and hitstun_left <= 0.0
+
+## Shared, pure hitstun calculation. A floor never lengthens the base duration.
+static func calculate_hitstun(power: float, duration: float, poise: float, minimum: float) -> float:
+	if power <= 0.0 or duration <= 0.0 or poise > power: return 0.0
+	return maxf(clampf(minimum, 0.0, duration), duration * (1.0 - clampf(poise / power, 0.0, 1.0) * 0.5))
+
+func effective_poise() -> float:
+	var result: float = definition.poise
+	for modifier in poise_modifiers.values(): result += float(modifier.amount)
+	return maxf(0.0, result)
+
+## Named bonuses can be negative. Negative duration persists until removed.
+func set_poise_modifier(source: String, amount: float, duration: float = -1.0) -> void:
+	if is_zero_approx(amount) or is_zero_approx(duration):
+		remove_poise_modifier(source)
+		return
+	poise_modifiers[source] = {"amount": amount, "left": duration}
+
+func set_effective_poise(source: String, value: float, duration: float = -1.0) -> void:
+	remove_poise_modifier(source)
+	var raw: float = definition.poise
+	for modifier in poise_modifiers.values(): raw += float(modifier.amount)
+	set_poise_modifier(source, maxf(0.0, value) - raw, duration)
+
+func remove_poise_modifier(source: String) -> void:
+	poise_modifiers.erase(source)
+
+func update_poise_modifiers(dt: float) -> void:
+	for key in poise_modifiers.keys():
+		var modifier: Dictionary = poise_modifiers[key]
+		if float(modifier.left) < 0.0: continue
+		modifier.left = maxf(0.0, float(modifier.left) - dt)
+		if modifier.left <= 0.0: poise_modifiers.erase(key)
+
+func update_hitstun(dt: float) -> void:
+	if hitstun_left > 0.0:
+		var previous: float = hitstun_left
+		hitstun_left = maxf(0.0, hitstun_left - dt)
+		if hitstun_left <= 0.0:
+			hitstun_immunity = maxf(0.0, arena.balance.hitstun_recovery_immunity - maxf(0.0, dt - previous))
+	else:
+		hitstun_immunity = maxf(0.0, hitstun_immunity - dt)
+
+func reset_hitstun() -> void:
+	hitstun_left = 0.0
+	hitstun_immunity = 0.0
+	poise_modifiers.clear()
+
+func apply_hitstun(power: float, duration: float) -> bool:
+	if not can_act() or hitstun_immunity > 0.0: return false
+	var seconds: float = calculate_hitstun(power, duration, effective_poise(), arena.balance.hitstun_min_duration)
+	if seconds <= 0.0: return false
+	hitstun_left = seconds
+	var recovery: float = attack_lock if swing_hit_committed or not swing_active else 0.0
+	interrupt_actions()
+	attack_lock = recovery
+	arena.float_text(position, "경직!", Color("ffd29a"))
+	return true
+
+func can_start_cancel_action() -> bool:
+	return can_act() and not guard_busy() and dash_left <= 0.0 and (attack_lock <= 0.0 or basic_swing)
+
+## Valid dash/skill may cancel a basic swing (or a held basic attack), never refund costs.
+func cancel_basic_attack() -> void:
+	clear_basic_preparation()
+	if not basic_swing: return
+	swing_active = false
+	basic_swing = false
+	swing_hit_committed = false
+	attack_lock = 0.0
+	swing_power = 1.0
+	remove_poise_modifier("swing")
+	$AnimationPlayer.stop()
+	$Visual.position = Vector2.ZERO
+	reset_weapon_pose()
+
+func clear_basic_preparation() -> void:
+	pass
+
+func cancel_special_action() -> void:
+	pass
+
+func interrupt_actions() -> void:
+	clear_basic_preparation()
+	cancel_special_action()
+	for key in pending_skills.keys(): remove_poise_modifier("skill_" + str(key))
+	pending_skills.clear()
+	for animator in ability_players.values(): animator.stop()
+	reset_guard()
+	dash_left = 0.0
+	velocity = Vector2.ZERO
+	$Visual.position = Vector2.ZERO
+	reset_weapon_pose()
+	swing_power = 1.0
+
+func attack_stagger_power() -> float:
+	return definition.attack_stagger_power
+
+func attack_stagger_duration() -> float:
+	return definition.attack_stagger_duration
 
 func can_guard() -> bool:
 	return guard != null
@@ -337,15 +450,7 @@ func trigger_exhaustion() -> void:
 	if exhaustion_left > 0.0 or not alive: return
 	exhaustion_left = arena.balance.exhaustion_duration
 	stamina = 0.0
-	reset_guard()
-	dash_left = 0.0
-	velocity = Vector2.ZERO
-	pending_skills.clear()
-	$AnimationPlayer.stop()
-	$Visual.position = Vector2.ZERO
-	reset_weapon_pose()
-	swing_power = 1.0
-	for animator in ability_players.values(): animator.stop()
+	interrupt_actions()
 	arena.float_text(position, "탈진!", Color("ff9f70"))
 
 func reset_weapon_pose() -> void:
@@ -366,13 +471,21 @@ func guard_busy() -> bool:
 func reset_guard() -> void:
 	if guard != null: guard.reset()
 	attack_lock = 0.0
+	swing_active = false
+	basic_swing = false
+	swing_hit_committed = false
+	remove_poise_modifier("swing")
 	$AnimationPlayer.stop()
 
 func perform_swing(multiplier: float = 1.0, use_attack_cooldown: bool = true) -> bool:
-	if not can_act() or guard_busy() or attack_lock > 0: return false
-	if use_attack_cooldown and cooldown.attack > 0: return false
+	if not can_start_cancel_action(): return false
+	if use_attack_cooldown and (cooldown.attack > 0 or attack_lock > 0 or not pending_skills.is_empty()): return false
 	if not spend_stamina(arena.balance.attack_stamina_cost): return false
+	if not use_attack_cooldown: cancel_basic_attack()
 	swing_power = multiplier
+	swing_active = true
+	basic_swing = use_attack_cooldown
+	swing_hit_committed = false
 	var swing: Animation = $AnimationPlayer.get_animation("swing")
 	attack_lock = swing.length / attack_speed
 	if use_attack_cooldown:
@@ -394,7 +507,10 @@ func attack_arc_radians() -> float:
 	return arena.balance.attack_arc
 
 func resolve_attack_hit() -> void:
-	if not can_act() or blocking or not arena.active(): return
+	if not swing_active or not can_act() or blocking or not arena.active(): return
+	if $AnimationPlayer.current_animation != "swing": return
+	if swing_hit_time >= 0.0 and $AnimationPlayer.current_animation_position + 0.001 < swing_hit_time: return
+	swing_hit_committed = true
 	var reach := attack_reach()
 	var arc := attack_arc_radians()
 	var count = 0
@@ -403,15 +519,16 @@ func resolve_attack_hit() -> void:
 		var offset: Vector2 = target.position - position
 		if offset.length() < reach + target.radius and (arc >= TAU or absf(angle_difference(facing, offset.angle())) < arc * 0.5):
 			var critical = randf() < crit
-			arena.deal_damage(target, damage * swing_power * (arena.balance.crit_damage_multiplier if critical else 1.0), self)
+			arena.deal_damage(target, damage * swing_power * (arena.balance.crit_damage_multiplier if critical else 1.0), self, Vector2.ZERO, attack_stagger_power(), attack_stagger_duration())
 			target.position += offset.normalized() * arena.balance.hit_pushback
 			count += 1
-			if groggy_left > 0 or (attack_target_limit > 0 and count >= attack_target_limit): break
+			if not can_act() or (attack_target_limit > 0 and count >= attack_target_limit): break
 	arena.add_xp(self, 0.35)
 
 func dash(direction: Vector2 = Vector2.ZERO) -> void:
-	if not can_act() or cooldown.dash > 0 or attack_lock > 0 or guard_busy(): return
+	if not can_start_cancel_action() or cooldown.dash > 0.0 or not pending_skills.is_empty(): return
 	if not spend_stamina(arena.balance.dash_stamina_cost): return
+	cancel_basic_attack()
 	if direction.length() < 0.1: direction = Vector2.from_angle(facing)
 	dash_left = arena.balance.dash_seconds
 	dash_velocity = direction.normalized() * arena.balance.dash_speed
@@ -436,8 +553,11 @@ func equip_ability(slot: String, ability: CrownAbility) -> void:
 	animator.add_animation_library("", library)
 
 func skill(key: String) -> void:
-	if not abilities.has(key) or not can_act() or not arena.active() or cooldown[key] > 0 or attack_lock > 0 or guard_busy(): return
+	if not abilities.has(key) or not can_start_cancel_action() or not arena.active() or cooldown[key] > 0: return
 	var ability: CrownAbility = abilities[key]
+	cancel_basic_attack()
+	var duration: float = ability.poise_duration if ability.poise_duration > 0.0 else ability.animation.length
+	set_poise_modifier("skill_" + key, ability.poise_bonus, duration)
 	cooldown[key] = ability.cooldown
 	pending_skills[key] = ability
 	ability_players[key].play("cast")
@@ -458,14 +578,7 @@ func add_groggy(amount: float) -> void:
 	groggy_decay_left = arena.balance.groggy_decay_delay
 	if groggy < arena.balance.groggy_threshold: return
 	groggy_left = arena.balance.groggy_duration
-	reset_guard()
-	dash_left = 0
-	velocity = Vector2.ZERO
-	pending_skills.clear()
-	$AnimationPlayer.stop()
-	$Visual.position = Vector2.ZERO
-	reset_weapon_pose()
-	for animator in ability_players.values(): animator.stop()
+	interrupt_actions()
 	arena.float_text(position, "그로기!", Color("ffcf63"))
 
 func update_groggy(dt: float) -> void:
@@ -502,7 +615,7 @@ func update_visual() -> void:
 	# Source sprite faces upward (-PI/2); align it with combat facing.
 	$Visual.rotation = facing + PI / 2.0
 	$Visual.scale = Vector2.ONE * body_scale
-	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd47b") if boss_flag else Color.WHITE)
+	$Visual/Body.modulate = Color("ff9476") if exhaustion_left > 0.0 else (Color("ffd29a") if hitstun_left > 0.0 else (Color("ffd47b") if boss_flag else Color.WHITE))
 	$NameLabel.text = "%s · %s · Lv.%d" % [display_name, CrownBuilds.profile_title(ai_build), level] if not is_player else "%s · Lv.%d" % [display_name, level]
 	$Health.value = hp / max_hp * 100
 	if guard != null: guard.update_visual()

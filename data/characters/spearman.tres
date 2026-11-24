@@ -9,3 +9,9 @@ description = "긴 창을 사용하는 무기 진화"
 unlock_level = 6
 parent_ids = PackedStringArray("knight")
 evolution_scene = ExtResource("2")
+
+poise = 15.0
+attack_stagger_power = 20.0
+attack_stagger_duration = 0.20
+guard_stagger_power = 10.0
+guard_stagger_duration = 0.25

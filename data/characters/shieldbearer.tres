@@ -10,3 +10,9 @@ unlock_level = 6
 parent_ids = PackedStringArray("knight")
 multipliers = {"damage": 0.8}
 evolution_scene = ExtResource("2")
+
+poise = 35.0
+attack_stagger_power = 20.0
+attack_stagger_duration = 0.20
+guard_stagger_power = 36.0
+guard_stagger_duration = 0.48

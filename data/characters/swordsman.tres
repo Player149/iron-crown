@@ -9,3 +9,9 @@ description = "검 공격 · 방패 방어"
 unlock_level = 6
 parent_ids = PackedStringArray("knight")
 evolution_scene = ExtResource("2")
+
+poise = 20.0
+attack_stagger_power = 25.0
+attack_stagger_duration = 0.25
+guard_stagger_power = 30.0
+guard_stagger_duration = 0.42

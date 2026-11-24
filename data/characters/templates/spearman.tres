@@ -5,3 +5,9 @@ script = ExtResource("1")
 id = "spearman"
 title = "창병"
 description = "창병 제작용 기본 틀"
+
+poise = 15.0
+attack_stagger_power = 20.0
+attack_stagger_duration = 0.20
+guard_stagger_power = 10.0
+guard_stagger_duration = 0.25

@@ -14,6 +14,9 @@ extends Resource
 @export var groggy_decay_rate: float = 2.0
 @export var perfect_guard_groggy: float = 60.0
 @export var groggy_recovery_immunity: float = 1.0
+@export_category("Hitstun")
+@export var hitstun_min_duration: float = 0.10
+@export var hitstun_recovery_immunity: float = 0.50
 @export_category("Stamina - timed combat")
 @export var stamina_max: float = 100.0
 @export var stamina_regen: float = 35.0
