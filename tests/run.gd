@@ -389,7 +389,15 @@ func run() -> void:
 			actor.attack()
 			check(actor.charging, "Hammer attack begins charge")
 			actor.charge_time = 3.0
+			actor.skill("e")
+			check(actor.cooldown.e > 0.0 and actor.charging, "Hammer heal preserves a held charge")
+			actor.dash(Vector2.RIGHT)
+			check(actor.dash_left > 0.0 and actor.charging, "Dash preserves hammer charge")
+			near(actor.charge_time, 3.0, "Dash preserves accumulated charge time")
 			actor.release_charge()
+			check(actor.charge_release_pending and not actor.swing_active, "Release during dash queues the swing")
+			actor.tick(actor.dash_left + 0.001)
+			check(actor.swing_active and not actor.charging, "Queued hammer swing starts after the dash")
 			near(actor.swing_power, 2.5, "Full hammer charge deals 250%")
 			actor.cooldown.e = 0.0
 			actor.hp = 40.0
