@@ -62,7 +62,7 @@ func tick(dt: float) -> void:
 			if mode == "barrier": drain *= BARRIER_DRAIN_MULTIPLIER
 			fighter.stamina = maxf(0.0, fighter.stamina - drain * dt)
 			if fighter.stamina <= 0.0: fighter.trigger_exhaustion()
-	update_visual()
+	if not fighter.arena.skip_step_visuals(): update_visual()
 
 func play_transition(animation_name: StringName, duration: float) -> void:
 	fallback_left = maxf(0.01, duration)
@@ -73,6 +73,7 @@ func play_transition(animation_name: StringName, duration: float) -> void:
 	animator.advance(0.0)
 
 func on_guard_raised() -> void:
+	if fighter.arena.queue_combat_event(on_guard_raised): return
 	if phase != "raise": return
 	using_fallback = false
 	phase = "hold"
@@ -82,6 +83,7 @@ func on_guard_raised() -> void:
 	if not requested: lower()
 
 func on_guard_lowered() -> void:
+	if fighter.arena.queue_combat_event(on_guard_lowered): return
 	if phase != "lower": return
 	using_fallback = false
 	phase = "idle"

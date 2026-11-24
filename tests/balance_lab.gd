@@ -48,6 +48,7 @@ func run_batch() -> void:
 	else:
 		game = host_game
 	game.set_physics_process(false)
+	game.simulation_batch = true
 	results.clear()
 	var total := CLASSES.size() * CLASSES.size()
 	var failures := 0
@@ -79,9 +80,6 @@ func run_batch() -> void:
 		right.ai_build = "assault"
 		CrownBuilds.allocate_ai(left)
 		CrownBuilds.allocate_ai(right)
-		for fighter in [left, right]:
-			var animation: AnimationPlayer = fighter.get_node("AnimationPlayer")
-			animation.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 		var left_spawn: Vector2 = left.position
 		var right_spawn: Vector2 = right.position
 		var left_taken := 0.0
@@ -90,11 +88,8 @@ func run_batch() -> void:
 		var right_hp_before: float = right.hp
 		var ticks := 0
 		while game.mode == "duel" and ticks < int(MAX_DUEL_SECONDS / DT):
-			game._physics_process(DT)
-			# Method tracks trigger real melee hit frames and ability actions.
-			for fighter in [left, right]:
-				if is_instance_valid(fighter):
-					fighter.get_node("AnimationPlayer").advance(DT)
+			# Exactly the same combat step as 1x and 16x, including all animations.
+			game.step_simulation(DT)
 			var hp_left_now: float = maxf(0.0, left.hp)
 			var hp_right_now: float = maxf(0.0, right.hp)
 			left_taken += maxf(0.0, left_hp_before - hp_left_now)
@@ -142,6 +137,7 @@ func run_batch() -> void:
 			print("BALANCE LAB %d/%d, %s vs %s: %s" % [i + 1, requested_runs, left_class, right_class, outcome])
 	Meta.muted = previous_mute
 	Meta.equipped = previous_equipped
+	game.simulation_batch = false
 	if embedded:
 		game.return_menu()
 		game.set_physics_process(true)

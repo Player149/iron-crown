@@ -19,3 +19,6 @@ godot --headless --path . res://tests/balance_lab.tscn -- --runs=100 --seed=421
 이번 실행의 결과를 화면에서 스크롤해 확인합니다. 대진별로 왼쪽·오른쪽 승수, 시간 초과 횟수, 평균 경기 시간을 표시합니다. 각 경기에는 직업, 승패, 소요 시간, 양측 최종 HP, 받은 피해 추정치, 난수 시드가 표시됩니다. 받은 피해는 틱 사이에 관측된 HP 감소량이므로 같은 틱의 회복에 영향을 받을 수 있습니다.
 
 명령행 실행 시 같은 상세 결과가 콘솔에 출력됩니다. 실험 결과는 메모리에서만 처리합니다.
+## Combat clock update
+
+The balance lab uses the same arena step_simulation(1/60) as regular combat and 16x fast-forward. All equipped skills, guard and normal attack animations are advanced once inside the step. Do not advance animations separately. Batch mode skips cosmetic effects and does not depend on render-frame callbacks for damage. Compare results only against records made with the same combat rules and simulation version.

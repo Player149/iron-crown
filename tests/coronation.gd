@@ -113,12 +113,12 @@ func run() -> void:
 	var normal_scale := Engine.time_scale
 	var normal_tick_rate := Engine.physics_ticks_per_second
 	game.ui.get_node("Root/HUD/FastForward").pressed.emit()
-	check(Engine.time_scale == normal_scale * 16.0, "HUD enables sixteen-times speed")
-	check(Engine.physics_ticks_per_second == normal_tick_rate * 16, "Fast-forward keeps combat physics step size")
+	check(game.simulation_rate() == 16, "HUD enables sixteen-times speed")
+	check(Engine.time_scale == normal_scale and Engine.physics_ticks_per_second == normal_tick_rate, "Fast-forward keeps engine clock unchanged")
 	game.paused = true
-	check(Engine.time_scale == normal_scale, "Pause restores normal engine speed")
+	check(game.simulation_rate() == 1, "Pause disables fast-forward")
 	game.paused = false
-	check(Engine.time_scale == normal_scale * 16.0, "Resume restores fast-forward")
+	check(game.simulation_rate() == 16, "Resume restores fast-forward")
 	game.run_gold = 0
 	var final_contraction = match_data.rules.closing_contractions.back()
 	final_contraction.duration_seconds = 31.0
@@ -132,8 +132,8 @@ func run() -> void:
 	match_data.step(0.0)
 	check(game.mode == "play" and game.elapsed == 480.0 and match_data.final_tournament, "Final tournament starts when the deathmatch countdown reaches zero")
 	check(match_data.bracket != bracket and not match_data.winner_announced, "Second tournament builds a new bracket")
-	game._physics_process(1.0)
-	check(game.elapsed == 480.0 and match_data.tournament_elapsed == 1.0, "Tournament advances its own clock while the deathmatch clock is frozen")
+	for i in 60: game.step_simulation(1.0 / 60.0)
+	check(game.elapsed == 480.0 and is_equal_approx(match_data.tournament_elapsed, 1.0), "Tournament advances its own clock while the deathmatch clock is frozen")
 	for i in 5:
 		match_data.step(20.0)
 	check(game.mode == "coronation_result" and game.elapsed == 480.0, "Final tournament leads directly to the iron ranking")

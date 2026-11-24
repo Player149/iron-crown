@@ -96,6 +96,7 @@ func _ready() -> void:
 	max_stamina = arena.balance.stamina_max
 	stamina = max_stamina
 	attack_target_limit = definition.attack_target_limit
+	configure_combat_animator($AnimationPlayer)
 	var library = $AnimationPlayer.get_animation_library("").duplicate(true)
 	$AnimationPlayer.remove_animation_library("")
 	$AnimationPlayer.add_animation_library("", library)
@@ -113,6 +114,17 @@ func _ready() -> void:
 		Meta.apply_runes(self)
 	$Visual/Body.modulate = Color.WHITE
 	update_visual()
+
+func configure_combat_animator(animator: AnimationPlayer) -> void:
+	animator.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	animator.callback_mode_method = AnimationMixer.ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE
+
+func advance_combat_animations(dt: float) -> void:
+	arena.advance_combat_animator($AnimationPlayer, dt)
+	if not alive or is_queued_for_deletion() or not arena.active(): return
+	for animator in ability_players.values():
+		arena.advance_combat_animator(animator, dt)
+		if not alive or is_queued_for_deletion() or not arena.active(): break
 
 func incoming_damage_multiplier(_direction_to_hit: Vector2) -> float:
 	return 1.0
@@ -166,7 +178,7 @@ func tick(dt: float) -> void:
 	position = position.clamp(bounds.position + Vector2.ONE * 30, bounds.end - Vector2.ONE * 30)
 	if no_hit_time >= arena.balance.regen_delay and (arena.coronation == null or arena.coronation.phase != 2):
 		hp = minf(max_hp, hp + max_hp * arena.balance.health_regen * dt)
-	update_visual()
+	if not arena.skip_step_visuals(): update_visual()
 
 func player_control() -> void:
 	var move = Input.get_vector("left", "right", "up", "down") + arena.touch_move
@@ -184,9 +196,10 @@ func player_control() -> void:
 	elif attack_lock > 0: multiplier *= arena.balance.swing_move_multiplier
 	velocity = move * speed * multiplier
 	if (not arena.touch_mode and Input.is_action_pressed("attack")) or arena.touch_attack: attack()
-	if Input.is_action_just_pressed("dash"): dash(move)
-	for key in ["e", "r", "q"]:
-		if Input.is_action_just_pressed(key): skill(key)
+	if arena.accept_edge_input:
+		if Input.is_action_just_pressed("dash"): dash(move)
+		for key in ["e", "r", "q"]:
+			if Input.is_action_just_pressed(key): skill(key)
 
 func clear_match_action() -> void:
 	pass
@@ -238,7 +251,8 @@ func ai_control(dt: float) -> void:
 	if guard_busy():
 		velocity *= arena.balance.guard_move_multiplier
 		return
-	if (attack_lock > 0.0 and not basic_swing) or not pending_skills.is_empty(): return
+	# AI commits to its normal swing until the hit key. Players retain full cancel freedom.
+	if (attack_lock > 0.0 and (not basic_swing or not swing_hit_committed)) or not pending_skills.is_empty(): return
 
 	if ai_use_class_skill(distance, reach, retreating, target_ready): return
 	if retreating:
@@ -304,7 +318,7 @@ func ai_defend(threat: float, escape: Vector2, dt: float) -> bool:
 		ai_reaction_left = randf_range(arena.balance.ai_player_reaction_seconds.x, arena.balance.ai_player_reaction_seconds.y)
 	elif facing_player:
 		ai_reaction_left = maxf(0.0, ai_reaction_left - dt)
-	if (attack_lock > 0.0 and not basic_swing) or not pending_skills.is_empty(): return false
+	if attack_lock > 0.0 or not pending_skills.is_empty(): return false
 
 	var guard_windup: float = arena.balance.guard_windup
 	var can_guard_hit := false
@@ -370,6 +384,7 @@ func remove_poise_modifier(source: String) -> void:
 	poise_modifiers.erase(source)
 
 func update_poise_modifiers(dt: float) -> void:
+	if poise_modifiers.is_empty(): return
 	for key in poise_modifiers.keys():
 		var modifier: Dictionary = poise_modifiers[key]
 		if float(modifier.left) < 0.0: continue
@@ -507,9 +522,8 @@ func attack_arc_radians() -> float:
 	return arena.balance.attack_arc
 
 func resolve_attack_hit() -> void:
-	if not swing_active or not can_act() or blocking or not arena.active(): return
-	if $AnimationPlayer.current_animation != "swing": return
-	if swing_hit_time >= 0.0 and $AnimationPlayer.current_animation_position + 0.001 < swing_hit_time: return
+	if arena.queue_combat_event(resolve_attack_hit): return
+	if not swing_active or swing_hit_committed or not can_act() or blocking or not arena.active() or is_queued_for_deletion(): return
 	swing_hit_committed = true
 	var reach := attack_reach()
 	var arc := attack_arc_radians()
@@ -545,6 +559,7 @@ func equip_ability(slot: String, ability: CrownAbility) -> void:
 		add_child(animator)
 		ability_players[slot] = animator
 	var animator = ability_players[slot]
+	configure_combat_animator(animator)
 	animator.stop()
 	pending_skills.erase(slot)
 	if animator.has_animation_library(""): animator.remove_animation_library("")
@@ -565,7 +580,8 @@ func skill(key: String) -> void:
 
 ## Called by the ability Animation method track, not by input or a timer.
 func resolve_skill_hit(key: String) -> void:
-	if not pending_skills.has(key): return
+	if arena.queue_combat_event(resolve_skill_hit.bind(key)): return
+	if is_queued_for_deletion() or not pending_skills.has(key): return
 	var ability: CrownAbility = pending_skills[key]
 	pending_skills.erase(key)
 	if not can_act() or not arena.active(): return

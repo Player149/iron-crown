@@ -571,6 +571,45 @@ func run() -> void:
 	check(game.mode == "menu", "Duel can return to the main menu")
 	game.start_game()
 	check(game.mode == "play" and game.monsters.size() == 28, "Standard arena remains available after duel")
+	# Both speed modes must run real hit keys, award the same iron and advance the same clock.
+	var normal_scale: float = Engine.time_scale
+	var normal_rate: int = Engine.physics_ticks_per_second
+	var samples: Array = []
+	for accelerated in [false, true]:
+		seed(7284)
+		game.balance = game.balance.duplicate()
+		game.balance.bot_count = 1
+		game.start_coronation()
+		game.touch_mode = true
+		game.touch_move = Vector2.ZERO
+		game.touch_attack = false
+		game.touch_block = false
+		game.touch_run = false
+		var striker = game.player
+		var target = game.fighters[1]
+		striker.position = game.bounds().size / 2.0
+		striker.facing = 0.0
+		striker.invuln = 5.0
+		striker.crit = 0.0
+		target.position = striker.position + Vector2(55, 0)
+		target.hp = 1.0
+		target.invuln = 0.0
+		target.groggy_left = 5.0
+		# Keep unrelated field actors out of the short deterministic test.
+		for monster in game.monsters:
+			monster.position = Vector2(80, 80)
+		game.coronation_fast_forward = accelerated
+		game.update_coronation_clock()
+		check(Engine.time_scale == normal_scale and Engine.physics_ticks_per_second == normal_rate, "Fast-forward does not change engine timing")
+		striker.attack()
+		for i in (3 if accelerated else 48):
+			game._physics_process(1.0 / 60.0)
+		samples.append([striker.iron_score, striker.kills, target.hp, game.elapsed, striker.stamina])
+		check(striker.iron_score == 1000 and striker.kills == 1 and not target.alive, "Melee hit key and iron reward execute at either speed")
+		check(is_equal_approx(game.elapsed, 0.8), "Same simulated time for both speed modes")
+	check(samples[0] == samples[1], "Normal and accelerated steps agree on iron, kills, damage, clock and stamina")
+	game.return_menu()
+	check(game.simulation_rate() == 1, "Returning to menu exits fast-forward")
 	game.mode = "menu"
 	game.queue_free()
 	await get_tree().process_frame

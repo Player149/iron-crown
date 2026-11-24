@@ -13,10 +13,14 @@ var monsters: Array = []
 var mode: String = "menu"
 const CORONATION_FAST_FORWARD_RATE: int = 16
 var coronation_fast_forward: bool = false
-var normal_time_scale: float = Engine.time_scale
-var normal_physics_rate: int = Engine.physics_ticks_per_second
-var normal_physics_step_limit: int = Engine.max_physics_steps_per_frame
+const SIMULATION_DT: float = 1.0 / 60.0
 var fast_forward_clock_active: bool = false
+var simulation_batch: bool = false
+var simulation_accumulator: float = 0.0
+var accept_edge_input: bool = true
+var collecting_combat_events: bool = false
+var combat_events: Array[Callable] = []
+var cosmetic_rng := RandomNumberGenerator.new()
 var paused: bool = false:
 	set(value):
 		paused = value
@@ -56,23 +60,34 @@ func toggle_coronation_fast_forward() -> void:
 	update_coronation_clock()
 
 func update_coronation_clock() -> void:
-	var accelerate := coronation_fast_forward and coronation != null and mode == "play" and not paused
-	if accelerate == fast_forward_clock_active: return
-	fast_forward_clock_active = accelerate
-	if accelerate:
-		normal_time_scale = Engine.time_scale
-		normal_physics_rate = Engine.physics_ticks_per_second
-		normal_physics_step_limit = Engine.max_physics_steps_per_frame
-		# Raise both rates to preserve the simulated duration of each combat step.
-		Engine.physics_ticks_per_second = normal_physics_rate * CORONATION_FAST_FORWARD_RATE
-		Engine.max_physics_steps_per_frame = maxi(normal_physics_step_limit, CORONATION_FAST_FORWARD_RATE * 4)
-		Engine.time_scale = normal_time_scale * CORONATION_FAST_FORWARD_RATE
-	else:
-		Engine.time_scale = normal_time_scale
-		Engine.physics_ticks_per_second = normal_physics_rate
-		Engine.max_physics_steps_per_frame = normal_physics_step_limit
+	# Never scale Godot's idle/animation clock independently of combat.
+	fast_forward_clock_active = coronation_fast_forward and coronation != null and mode == "play" and not paused
+
+func simulation_rate() -> int:
+	return CORONATION_FAST_FORWARD_RATE if fast_forward_clock_active else 1
+
+func skip_step_visuals() -> bool:
+	return fast_forward_clock_active or simulation_batch
+
+## Animation method keys enqueue only during advance(), then execute immediately
+## after the animator returns. This avoids reentrant stop()/play() on a mixer.
+func queue_combat_event(event: Callable) -> bool:
+	if not collecting_combat_events: return false
+	combat_events.append(event)
+	return true
+
+func advance_combat_animator(animator: AnimationPlayer, dt: float) -> void:
+	if not animator.is_playing(): return
+	collecting_combat_events = true
+	animator.advance(dt)
+	collecting_combat_events = false
+	var events := combat_events.duplicate()
+	combat_events.clear()
+	for event in events:
+		if event.is_valid(): event.call()
 
 func _ready() -> void:
+	cosmetic_rng.randomize()
 	setup_input()
 	touch_mode = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")
 	for key in ["swing", "hit", "heavy", "dash", "skill", "level", "death"]:
@@ -139,6 +154,7 @@ func clear_coronation() -> void:
 	update_coronation_clock()
 
 func start_game(boost: bool = false, use_coronation: bool = false) -> void:
+	simulation_accumulator = 0.0
 	clear_coronation()
 	$Zones.show()
 	duel_enemy = null
@@ -269,6 +285,7 @@ func spawn_fighter(human: bool):
 
 ## A self-contained, equal-level fight without XP, monsters, zones or boss events.
 func start_duel(player_class: String = "swordsman", enemy_class: String = "hammerman") -> void:
+	simulation_accumulator = 0.0
 	if CrownCatalog.ROSTER.find(player_class) == null or CrownCatalog.ROSTER.find(enemy_class) == null: return
 	clear_coronation()
 	duel_player_class = player_class
@@ -330,6 +347,19 @@ func fighter_bounds(f) -> Rect2:
 	return coronation.combat_bounds(f) if coronation != null else bounds()
 
 func _physics_process(dt: float) -> void:
+	# Same 1/60s step in live play, fast-forward and the balance lab.
+	if not active(): return
+	simulation_accumulator += dt * simulation_rate()
+	accept_edge_input = true
+	while simulation_accumulator + 0.00000001 >= SIMULATION_DT and active():
+		simulation_accumulator = maxf(0.0, simulation_accumulator - SIMULATION_DT)
+		step_simulation(SIMULATION_DT)
+		accept_edge_input = false
+	accept_edge_input = true
+	if not active(): simulation_accumulator = 0.0
+	if not simulation_batch: render_simulation_frame(dt)
+
+func step_simulation(dt: float = SIMULATION_DT) -> void:
 	if active():
 		if coronation == null or coronation.phase != 2:
 			elapsed += dt
@@ -355,6 +385,11 @@ func _physics_process(dt: float) -> void:
 					fighters.erase(f)
 					f.queue_free()
 					spawn_fighter(false)
+		# Advance all combat animations exactly once, before the next combat step.
+		for f in fighters.duplicate():
+			if not active(): break
+			if is_instance_valid(f) and f.alive and not f.is_queued_for_deletion():
+				f.advance_combat_animations(dt)
 		if coronation != null and active():
 			if coronation.phase != 2:
 				for m in monsters.duplicate(): m.tick(dt)
@@ -371,8 +406,14 @@ func _physics_process(dt: float) -> void:
 		if boss_finish_pending:
 			boss_finish_pending = false
 			finish_boss(true)
-	for fx in effects: fx.life -= dt
-	effects = effects.filter(func(fx): return fx.life > 0)
+	if not effects.is_empty():
+		for fx in effects: fx.life -= dt
+		effects = effects.filter(func(fx): return fx.life > 0)
+
+func render_simulation_frame(dt: float) -> void:
+	if fast_forward_clock_active:
+		for f in fighters:
+			if f.alive: f.update_visual()
 	if is_instance_valid(player):
 		var focus = player if player.alive or boss == null else boss
 		if coronation != null and not player.alive and coronation.phase == 2:
@@ -694,8 +735,8 @@ func return_menu() -> void:
 	ui.show_menu()
 
 func sound(key: String, source) -> void:
-	if Meta.muted or not sounds.has(key): return
-	if source != player and randf() > 0.12: return
+	if skip_step_visuals() or Meta.muted or not sounds.has(key): return
+	if source != player and cosmetic_rng.randf() > 0.12: return
 	if key == "hit" and Meta.rune_level("echo") > 0: key = "heavy"
 	var audio = AudioStreamPlayer.new()
 	audio.stream = sounds[key]
@@ -705,9 +746,11 @@ func sound(key: String, source) -> void:
 	audio.play()
 
 func float_text(at: Vector2, text: String, color: Color) -> void:
+	if skip_step_visuals(): return
 	effects.append({"type": "text", "at": at, "text": text, "color": color, "life": 1.2, "max": 1.2})
 
 func fx_ring(at: Vector2, radius: float, color: Color, life: float) -> void:
+	if skip_step_visuals(): return
 	effects.append({"type": "ring", "at": at, "radius": radius, "color": color, "life": life, "max": life})
 
 func _draw() -> void:

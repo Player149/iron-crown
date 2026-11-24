@@ -9,3 +9,7 @@ CrownFighter.set_poise_modifier(source, amount, duration=-1) sets or replaces a 
 Basic swing (including hammer charge) can be cancelled into a valid dash or skill, before or after the damage keyframe. No stamina or cooldown refund. A cancelled startup cannot deal damage, committed damage remains. Skill swing is not a basic swing. Hitstun can interrupt pending skills and motion; committed attack recovery is retained. On respawn and encounter transitions transient states reset.
 
 Regression tests: tests/run.tscn. Web/real input and balance need playtesting.
+
+## Fixed-step combat clock
+
+The arena runs simulation at 1/60 s per step. Fast-forward requests sixteen steps per normal physics tick without changing Engine.time_scale or the physics tick rate. The lab calls the same step_simulation directly. All melee, guard and equipped skill AnimationPlayers use manual advance and immediate method callbacks; combat events raised during advance are drained immediately after the animation returns, before the next step. Cancelled and already committed melee hits are ignored. AI now commits to a normal swing through the hit key, and does not request guards during an attack lock; player cancel rules are unchanged. Fast-forward/batch mode skips per-step cosmetic text, rings, audio and fighter visual refreshes; cosmetic sound RNG is isolated from the combat RNG. Tests compare a controlled kill and iron reward at 1x and 16x with the same seed. Full-match statistical validation remains necessary.
