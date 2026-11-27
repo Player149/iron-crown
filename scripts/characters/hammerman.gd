@@ -14,6 +14,7 @@ extends "res://scripts/fighter.gd"
 @export var ironman_poise_duration: float = 0.5
 var charging: bool = false
 var charge_time: float = 0.0
+var charge_release_pending: bool = false
 
 func _ready() -> void:
 	super._ready()
@@ -24,6 +25,7 @@ func clear_match_action() -> void:
 
 func clear_basic_preparation() -> void:
 	charging = false
+	charge_release_pending = false
 	charge_time = 0.0
 	remove_poise_modifier("hammer_charge")
 
@@ -38,17 +40,23 @@ func tick(dt: float) -> void:
 	if not can_act() or not arena.active():
 		clear_basic_preparation()
 		return
-	charge_time = minf(max_charge_seconds, charge_time + dt)
-	if charge_time >= charge_poise_threshold: set_poise_modifier("hammer_charge", charge_poise_bonus)
-	if is_player:
+	if not charge_release_pending:
+		charge_time = minf(max_charge_seconds, charge_time + dt)
+		if charge_time >= charge_poise_threshold: set_poise_modifier("hammer_charge", charge_poise_bonus)
+	if charge_release_pending:
+		release_charge()
+	elif is_player:
 		var held: bool = (Input.is_action_pressed("attack") and not arena.touch_mode) or arena.touch_attack
 		if not held: release_charge()
-	else:
+	elif dash_left <= 0.0:
 		ai_update_charge()
 	queue_redraw()
 
 func release_charge() -> void:
 	if not charging: return
+	if not can_start_cancel_action() or not pending_skills.is_empty():
+		charge_release_pending = true
+		return
 	var power: float = 1.0 + charge_bonus_multiplier * clampf(charge_time / max_charge_seconds, 0.0, 1.0)
 	var charged: bool = charge_time >= charge_poise_threshold
 	clear_basic_preparation()

@@ -419,9 +419,8 @@ func apply_hitstun(power: float, duration: float) -> bool:
 func can_start_cancel_action() -> bool:
 	return can_act() and not guard_busy() and dash_left <= 0.0 and (attack_lock <= 0.0 or basic_swing)
 
-## Valid dash/skill may cancel a basic swing (or a held basic attack), never refund costs.
+## Valid dash/skill may cancel an active basic swing without refunding costs.
 func cancel_basic_attack() -> void:
-	clear_basic_preparation()
 	if not basic_swing: return
 	swing_active = false
 	basic_swing = false
