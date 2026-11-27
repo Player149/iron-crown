@@ -46,7 +46,17 @@ jobs:
       - name: Export Web
         run: |
           mkdir -p build/web
-          godot --headless --path . --export-release Web build/web/index.html
+          # Version every engine and game asset together; keep the same URL directory for saves.
+          stem="play-${GITHUB_SHA:0:12}"
+          godot --headless --path . --export-release Web "build/web/$stem.html"
+          cp "build/web/$stem.html" build/web/index.html
+          cp "build/web/$stem.html" build/web/play.html
+          printf '%s\n' "$GITHUB_SHA" > build/web/build-id.txt
+          # Replace the previously registered PWA worker without touching save storage.
+          cat > build/web/index.service.worker.js <<'JS'
+          self.addEventListener("install", event => event.waitUntil(self.skipWaiting()));
+          self.addEventListener("activate", event => event.waitUntil(self.registration.unregister()));
+          JS
           touch build/web/.nojekyll
       - name: Verify exported web game starts from menu in Chromium
         run: |
@@ -54,7 +64,7 @@ jobs:
           python -m playwright install --with-deps chromium
           python -m http.server 8765 --directory build/web >/tmp/iron-web.log 2>&1 &
           python - <<'PY'
-          import re
+          import re, os
           from playwright.sync_api import sync_playwright
           with sync_playwright() as p:
               browser = p.chromium.launch(args=["--enable-webgl", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
@@ -63,7 +73,7 @@ jobs:
               page.on("console", lambda msg: (logs.append(msg.text), print(msg.text, flush=True)))
               page.on("pageerror", lambda err: print(err, flush=True))
               with page.expect_event("console", predicate=lambda msg: "IRON_CROWN_MENU_READY " in msg.text, timeout=90000) as ready:
-                  page.goto("http://127.0.0.1:8765/", wait_until="domcontentloaded")
+                  page.goto("http://127.0.0.1:8765/play-" + os.environ["GITHUB_SHA"][:12] + ".html", wait_until="domcontentloaded")
               match = re.search(r"IRON_CROWN_MENU_READY ([0-9.]+) ([0-9.]+)", ready.value.text)
               assert match, ready.value.text
               canvas = page.locator("canvas").first
@@ -100,3 +110,20 @@ jobs:
       - name: Publish project site
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify published build version and entry URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGE_URL%/}"
+          for attempt in $(seq 1 20); do
+            actual=$(curl -fsSL "$base/build-id.txt?rev=$GITHUB_SHA" || true)
+            if [ "$actual" = "$GITHUB_SHA" ]; then
+              curl -fsSL "$base/play-${GITHUB_SHA:0:12}.html" | grep -F "play-${GITHUB_SHA:0:12}.js" >/dev/null
+              echo "Published version verified: $GITHUB_SHA"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Published version not visible" >&2
+          exit 1
