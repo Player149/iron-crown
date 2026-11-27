@@ -48,6 +48,34 @@ jobs:
           mkdir -p build/web
           godot --headless --path . --export-release Web build/web/index.html
           touch build/web/.nojekyll
+      - name: Verify exported web game starts from menu in Chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+          python -m http.server 8765 --directory build/web >/tmp/iron-web.log 2>&1 &
+          python - <<'PY'
+          import re
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch(args=["--enable-webgl", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+              page = browser.new_page(viewport={"width": 1152, "height": 648})
+              logs = []
+              page.on("console", lambda msg: (logs.append(msg.text), print(msg.text, flush=True)))
+              page.on("pageerror", lambda err: print(err, flush=True))
+              with page.expect_event("console", predicate=lambda msg: "IRON_CROWN_MENU_READY " in msg.text, timeout=90000) as ready:
+                  page.goto("http://127.0.0.1:8765/", wait_until="domcontentloaded")
+              match = re.search(r"IRON_CROWN_MENU_READY ([0-9.]+) ([0-9.]+)", ready.value.text)
+              assert match, ready.value.text
+              canvas = page.locator("canvas").first
+              rect = canvas.bounding_box()
+              assert rect, "Game canvas missing"
+              x, y = map(float, match.groups())
+              with page.expect_event("console", predicate=lambda msg: "IRON_CROWN_GAME_STARTED play" in msg.text, timeout=30000):
+                  page.mouse.click(rect["x"] + x * rect["width"], rect["y"] + y * rect["height"])
+              page.wait_for_timeout(2000)
+              assert not any("SCRIPT ERROR" in line or "Parse Error" in line for line in logs), logs
+              browser.close()
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: iron-crown-web
