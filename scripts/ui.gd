@@ -76,6 +76,17 @@ func _ready() -> void:
 		if child is Label: child.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	get_window().size_changed.connect(refresh_layout)
 	refresh_layout.call_deferred()
+	if OS.has_feature("web"):
+		print_web_menu_ready.call_deferred()
+
+func print_web_menu_ready() -> void:
+	# Report normalized button coordinates for the exported-browser smoke test.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var extent := get_viewport().get_visible_rect().size
+	var start: Control = box.get_node("Start")
+	var point := start.get_global_rect().get_center() / extent
+	print("IRON_CROWN_MENU_READY %.6f %.6f" % [point.x, point.y])
 
 func style_buttons(node: Node) -> void:
 	if node is Button:
@@ -123,6 +134,8 @@ func show_menu() -> void:
 	box.get_node("Boost").hide()
 
 func show_game() -> void:
+	if OS.has_feature("web"):
+		print("IRON_CROWN_GAME_STARTED " + arena.mode)
 	menu.hide()
 	modal.hide()
 	evolution_panel.hide()
